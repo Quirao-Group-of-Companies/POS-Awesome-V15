@@ -9,53 +9,61 @@ describe("useItemsSelectorPriceListSync", () => {
 		const updatePriceList = vi.fn(async (priceList: string) => {
 			activePriceList.value = priceList;
 		});
-		const getItems = vi.fn(async () => []);
 
 		const sync = useItemsSelectorPriceListSync({
 			activePriceList,
 			getDefaultPriceList: () => "Retail",
 			updatePriceList,
-			getItems,
 		});
 
 		await sync.syncSelectorPriceList(" Wholesale ");
 
 		expect(updatePriceList).toHaveBeenCalledWith("Wholesale");
-		expect(getItems).toHaveBeenCalledWith(true);
 	});
 
-	it("falls back to the profile selling price list for blank input", async () => {
+	it("falls back to the profile selling price list for blank input without reloading unchanged items", async () => {
 		const activePriceList = ref("Retail");
 		const updatePriceList = vi.fn();
-		const getItems = vi.fn(async () => []);
 
 		const sync = useItemsSelectorPriceListSync({
 			activePriceList,
 			getDefaultPriceList: () => "Retail",
 			updatePriceList,
-			getItems,
 		});
 
 		await sync.syncSelectorPriceList("  ");
 
+		expect(sync.resolveIncomingPriceList("  ")).toBe("Retail");
 		expect(updatePriceList).not.toHaveBeenCalled();
-		expect(getItems).toHaveBeenCalledWith(true);
+	});
+
+	it("skips redundant updates after trimming the incoming price list", async () => {
+		const activePriceList = ref("Wholesale");
+		const updatePriceList = vi.fn();
+
+		const sync = useItemsSelectorPriceListSync({
+			activePriceList,
+			getDefaultPriceList: () => "Retail",
+			updatePriceList,
+		});
+
+		await sync.syncSelectorPriceList(" Wholesale ");
+
+		expect(sync.resolveIncomingPriceList(" Wholesale ")).toBe("Wholesale");
+		expect(updatePriceList).not.toHaveBeenCalled();
 	});
 
 	it("does nothing when no incoming or default price list is available", async () => {
 		const updatePriceList = vi.fn();
-		const getItems = vi.fn();
 		const sync = useItemsSelectorPriceListSync({
 			activePriceList: ref(""),
 			getDefaultPriceList: () => "",
 			updatePriceList,
-			getItems,
 		});
 
 		await sync.syncSelectorPriceList(null);
 
 		expect(sync.resolveIncomingPriceList(null)).toBe("");
 		expect(updatePriceList).not.toHaveBeenCalled();
-		expect(getItems).not.toHaveBeenCalled();
 	});
 });

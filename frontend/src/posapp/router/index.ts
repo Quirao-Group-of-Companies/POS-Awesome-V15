@@ -72,6 +72,16 @@ const routes = [
 		},
 	},
 	{
+		path: "/tables",
+		component: () =>
+			import("../components/restaurant/RestaurantTableDashboard.vue"),
+		meta: {
+			title: "Restaurant Tables",
+			layout: "display",
+			loadingMessage: "Loading restaurant tables...",
+		},
+	},
+	{
 		path: "/closing",
 		component: () => import("../components/pos/shell/ClosingDialog.vue"),
 		meta: {

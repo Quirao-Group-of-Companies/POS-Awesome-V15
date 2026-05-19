@@ -28,6 +28,13 @@
 						<strong class="summary-hero__amount">
 							{{ currencySymbol(displayCurrency) }}{{ formatCurrency(subtotal) }}
 						</strong>
+						<div class="summary-hero__service-charge">
+							<span class="summary-hero__eyebrow">{{ serviceChargeLabel }}</span>
+							<strong class="summary-hero__amount">
+								{{ currencySymbol(displayCurrency) }}{{ formatCurrency(serviceChargeAmount) }}
+							</strong>
+						</div>
+						
 						<div class="summary-hero__meta">
 							<span
 								>{{ formatFloat(total_qty, hide_qty_decimals ? 0 : undefined) }}
@@ -216,12 +223,15 @@ const props = defineProps({
 	discount_percentage_offer_name: [String, Number],
 	isNumber: Function,
 	return_discount_meta: Object,
+	service_charge_rate: { type: Number, default: 0.05 },
+	service_charge_percent: { type: Number, default: 5 },
 });
 
 const emit = defineEmits([
 	"update:additional_discount",
 	"update:additional_discount_percentage",
 	"update_discount_umount",
+	"update:service_charge",
 	"save-and-clear",
 	"load-drafts",
 	"select-order",
@@ -264,6 +274,27 @@ const showReturnDiscountAlert = computed(
 		!props.pos_profile?.posa_use_percentage_discount &&
 		!isFullReturnDiscount(props.return_discount_meta?.ratio),
 );
+const resolvedServiceChargeRate = computed(() => {
+	const rate = Number(props.service_charge_rate);
+	if (Number.isFinite(rate) && rate >= 0) {
+		return rate;
+	}
+	const percent = Number(props.service_charge_percent);
+	return Number.isFinite(percent) && percent >= 0 ? percent / 100 : 0.05;
+});
+
+const serviceChargeLabel = computed(() => {
+	const percent = Number(props.service_charge_percent);
+	const displayPercent =
+		Number.isFinite(percent) && percent >= 0
+			? percent
+			: resolvedServiceChargeRate.value * 100;
+	return __("Service Charge ({0}%)", [displayPercent]);
+});
+
+const serviceChargeAmount = computed(() => {
+	return props.subtotal * resolvedServiceChargeRate.value;
+});
 const allDrafts = computed(() => (Array.isArray(parkedOrders.value) ? parkedOrders.value : []));
 const availableDraftSources = computed(() => getAvailableDocumentSources(props.pos_profile));
 const showDraftSourceSelector = computed(() => shouldShowDocumentSourceSelector(availableDraftSources.value));
@@ -287,6 +318,15 @@ const hide_qty_decimals = computed(() => {
 	const opts = loadItemSelectorSettings();
 	return !!opts?.hide_qty_decimals;
 });
+
+watch(
+	() => [props.subtotal, resolvedServiceChargeRate.value],
+	([newTotal]) => {
+		const charge = Number(newTotal) * resolvedServiceChargeRate.value;
+		emit("update:service_charge", charge);
+	},
+	{ immediate: true },
+);
 
 watch(
 	() => props.pos_profile,
@@ -550,6 +590,15 @@ defineExpose({
 
 .sticky-summary-card--dock-safe {
 	margin-bottom: calc(var(--bottom-safe-space) + 8px);
+}
+
+.summary-hero__service-charge {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(var(--v-theme-primary), 0.12);
+    margin-top: 4px;
 }
 
 .summary-content {

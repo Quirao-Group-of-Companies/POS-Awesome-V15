@@ -153,11 +153,21 @@ export const useUIStore = defineStore("ui", () => {
   // POS Profile & Settings
   const posProfile = ref<POSProfile | null>(null);
   const stockSettings = ref<Record<string, any>>({});
+  const posSettings = ref<Record<string, any>>({});
   const companyDoc = ref<any>(null);
   const posOpeningShift = ref<any>(null);
 
   const currency = computed(() => posProfile.value?.currency || "");
   const company = computed(() => posProfile.value?.company || "");
+
+  /** Service charge percent from POS Settings (e.g. 5 = 5%). Defaults to 5. */
+  const serviceChargePercent = computed(() => {
+    const raw = Number(posSettings.value?.service_charge_percent);
+    return Number.isFinite(raw) && raw >= 0 ? raw : 5;
+  });
+
+  /** Decimal rate applied to subtotal (e.g. 0.05 for 5%). */
+  const serviceChargeRate = computed(() => serviceChargePercent.value / 100);
 
   function setPosProfile(profile: POSProfile) {
     posProfile.value = profile;
@@ -167,13 +177,24 @@ export const useUIStore = defineStore("ui", () => {
     stockSettings.value = settings || {};
   }
 
+  function setPosSettings(settings: Record<string, any>) {
+    posSettings.value = settings || {};
+  }
+
   function setCompanyDoc(doc: any) {
     companyDoc.value = doc;
   }
 
-  function setRegisterData(data: { pos_profile?: POSProfile; stock_settings?: any; company?: any; pos_opening_shift?: any }) {
+  function setRegisterData(data: {
+    pos_profile?: POSProfile;
+    stock_settings?: any;
+    pos_settings?: Record<string, any>;
+    company?: any;
+    pos_opening_shift?: any;
+  }) {
     if (data.pos_profile) posProfile.value = data.pos_profile;
     if (data.stock_settings) stockSettings.value = data.stock_settings;
+    if (data.pos_settings) posSettings.value = data.pos_settings;
     if (data.company) companyDoc.value = data.company;
     if (data.pos_opening_shift) posOpeningShift.value = data.pos_opening_shift;
   }
@@ -316,6 +337,9 @@ export const useUIStore = defineStore("ui", () => {
     closeOrders,
     posProfile,
     stockSettings,
+    posSettings,
+    serviceChargePercent,
+    serviceChargeRate,
     companyDoc,
     posOpeningShift,
     lastInvoiceId,
@@ -328,6 +352,7 @@ export const useUIStore = defineStore("ui", () => {
     unfreeze,
     setPosProfile,
     setStockSettings,
+    setPosSettings,
     setCompanyDoc,
     setRegisterData,
     setLastInvoice,

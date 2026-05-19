@@ -142,7 +142,6 @@ export async function cancel_invoice(context: any) {
 	// Or assume context has the method proxied.
 	// Since we are refactoring, let's call the util directly if possible, or rely on context.
 	const doc = get_invoice_doc(context);
-
 	context.posting_date = frappe.datetime.nowdate();
 
 	if (doc.name && context.pos_profile.posa_allow_delete) {

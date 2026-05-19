@@ -312,29 +312,29 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 			value,
 		);
 
-		if (
-			field_name === "qty" &&
-			item?.posa_is_offer &&
-			item?._offer_constraints &&
-			Number.isFinite(Number(item._offer_constraints.max_qty))
-		) {
-			const maxOfferQty = Math.max(
-				0,
-				Number(item._offer_constraints.max_qty || 0),
-			);
-			if (maxOfferQty > 0 && Math.abs(Number(parsedValue || 0)) > maxOfferQty) {
-				const limitedQty = parsedValue < 0 ? -maxOfferQty : maxOfferQty;
-				item[field_name] = limitedQty;
-				parsedValue = limitedQty;
-				toastStore.show({
-					title: __(
-						"Maximum offer quantity is {0}. Quantity adjusted to allowed limit.",
-						[formatFloat(maxOfferQty, effectivePrecision)],
-					),
-					color: "error",
-				});
-			}
-		}
+		// if (
+		// 	field_name === "qty" &&
+		// 	item?.posa_is_offer &&
+		// 	item?._offer_constraints &&
+		// 	Number.isFinite(Number(item._offer_constraints.max_qty))
+		// ) {
+		// 	const maxOfferQty = Math.max(
+		// 		0,
+		// 		Number(item._offer_constraints.max_qty || 0),
+		// 	);
+		// 	if (maxOfferQty > 0 && Math.abs(Number(parsedValue || 0)) > maxOfferQty) {
+		// 		const limitedQty = parsedValue < 0 ? -maxOfferQty : maxOfferQty;
+		// 		item[field_name] = limitedQty;
+		// 		parsedValue = limitedQty;
+		// 		toastStore.show({
+		// 			title: __(
+		// 				"Maximum offer quantity is {0}. Quantity adjusted to allowed limit.",
+		// 				[formatFloat(maxOfferQty, effectivePrecision)],
+		// 			),
+		// 			color: "error",
+		// 		});
+		// 	}
+		// }
 
 		const enforceStockLimits = shouldEnforceStockLimits(item);
 		const allowNegativeStock =
@@ -346,23 +346,23 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 				? resolveItemMaxQty(item)
 				: item.max_qty;
 
-		if (
-			enforceStockLimits &&
-			maxQty !== undefined &&
-			!allowNegativeStock &&
-			flt(item[field_name], effectivePrecision) >
-				flt(maxQty, effectivePrecision)
-		) {
-			item[field_name] = maxQty;
-			parsedValue = maxQty;
-			toastStore.show({
-				title: __(
-					"Maximum available quantity is {0}. Quantity adjusted to match stock.",
-					[formatFloat(maxQty, effectivePrecision)],
-				),
-				color: "error",
-			});
-		}
+		// if (
+		// 	enforceStockLimits &&
+		// 	maxQty !== undefined &&
+		// 	!allowNegativeStock &&
+		// 	flt(item[field_name], effectivePrecision) >
+		// 		flt(maxQty, effectivePrecision)
+		// ) {
+		// 	item[field_name] = maxQty;
+		// 	parsedValue = maxQty;
+		// 	toastStore.show({
+		// 		title: __(
+		// 			"Maximum available quantity is {0}. Quantity adjusted to match stock.",
+		// 			[formatFloat(maxQty, effectivePrecision)],
+		// 		),
+		// 		color: "error",
+		// 	});
+		// }
 
 		if (isReturnInvoice.value && parsedValue > 0) {
 			parsedValue = -Math.abs(parsedValue);

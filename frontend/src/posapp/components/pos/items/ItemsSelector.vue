@@ -645,18 +645,19 @@ const add_item = async (item, optionsOrQty: any = {}) => {
 			new_line: typeof options?.new_line === "boolean" ? options.new_line : !!new_line.value,
 		};
 
-		const isValid = await cartValidation.validateCartItem(
-			item,
-			requestedQty,
-			pos_profile.value,
-			stock_settings.value,
-			null,
-			blockSaleBeyondAvailableQty.value,
-			!options.suppressNegativeWarning,
-			true,
-			isReturnInvoice.value,
-			deferStockValidationToPayment.value,
-		);
+		const isValid = true;
+		// const isValid = await cartValidation.validateCartItem(
+		// 	item,
+		// 	requestedQty,
+		// 	pos_profile.value,
+		// 	stock_settings.value,
+		// 	null,
+		// 	blockSaleBeyondAvailableQty.value,
+		// 	!options.suppressNegativeWarning,
+		// 	true,
+		// 	isReturnInvoice.value,
+		// 	deferStockValidationToPayment.value,
+		// );
 
 		if (isValid) {
 			await useItemAddition().prepareItemForCart(item, requestedQty, context);

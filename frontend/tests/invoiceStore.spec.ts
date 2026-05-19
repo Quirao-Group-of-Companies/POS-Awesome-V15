@@ -58,6 +58,16 @@ describe("invoiceStore invoice type state", () => {
 		expect(store.selectedDeliveryCharge).toBe("");
 	});
 
+	it("clears service charge when the invoice is cleared", () => {
+		const store = useInvoiceStore();
+
+		store.setServiceCharge(125);
+
+		store.clear();
+
+		expect(store.serviceCharge).toBe(0);
+	});
+
 	it("resets invoice type when clearing without preserved stickies", () => {
 		const store = useInvoiceStore();
 

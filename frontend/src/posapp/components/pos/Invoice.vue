@@ -233,6 +233,8 @@
 		<InvoiceSummary
 			ref="invoiceSummary"
 			:pos_profile="pos_profile"
+			:service_charge_rate="service_charge_rate"
+			:service_charge_percent="service_charge_percent"
 			:total_qty="total_qty"
 			:additional_discount="additional_discount"
 			:additional_discount_percentage="additional_discount_percentage"
@@ -248,6 +250,7 @@
 			@update:additional_discount="(val) => (additional_discount = val)"
 			@update:additional_discount_percentage="(val) => (additional_discount_percentage = val)"
 			@update_discount_umount="update_discount_umount"
+			@update:service_charge="updateServiceCharge"
 			@save-and-clear="save_and_clear_invoice"
 			@load-drafts="get_draft_invoices"
 			@select-order="get_draft_orders"
@@ -487,6 +490,20 @@ export default {
 				this.invoiceStore.setPostingDate(val);
 			},
 		},
+		service_charge: {
+			get() {
+				return this.invoiceStore.serviceCharge;
+			},
+			set(val) {
+				this.invoiceStore.setServiceCharge(val);
+			},
+		},
+		service_charge_rate() {
+			return this.uiStore.serviceChargeRate;
+		},
+		service_charge_percent() {
+			return this.uiStore.serviceChargePercent;
+		},
 		return_discount_meta() {
 			if (!this.isReturnInvoice || !this.return_doc || this.pos_profile?.posa_use_percentage_discount) {
 				return null;
@@ -652,6 +669,9 @@ export default {
 			this.posting_date = date;
 			this.invoiceStore.setPostingDate(date);
 			this.$forceUpdate();
+		},
+		updateServiceCharge(amount) {
+			this.invoiceStore.setServiceCharge(amount);
 		},
 
 		update_exchange_rate() {

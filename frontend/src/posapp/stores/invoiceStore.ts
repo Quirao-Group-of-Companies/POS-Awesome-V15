@@ -123,7 +123,8 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		let tQty = 0;
 		let tGross = 0;
 		let tDisc = 0;
-
+		console.log("itemsData",itemsData);
+		
 		for (const item of Array.from(itemsData.values())) {
 			const qty = toNumber(item.qty);
 			const rate = toNumber(item.rate);
@@ -247,6 +248,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	const deliveryCharges = ref<DeliveryCharge[]>([]);
 	const deliveryChargesRate = ref(0);
 	const selectedDeliveryCharge = ref("");
+	const serviceCharge = ref(0);
 	/**
 	 * `true` when `invoiceType` is `"Order"` or `"Quotation"`.
 	 *
@@ -327,6 +329,16 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		deliveryCharges.value = [];
 		deliveryChargesRate.value = 0;
 		selectedDeliveryCharge.value = "";
+	};
+
+	/** Sets the transaction-level service charge amount. Non-numeric values are coerced to `0`. */
+	const setServiceCharge = (val: any) => {
+		serviceCharge.value = toNumber(val);
+	};
+
+	/** Resets `serviceCharge` to `0`. */
+	const resetServiceCharge = () => {
+		serviceCharge.value = 0;
 	};
 
 	/**
@@ -606,6 +618,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			additionalDiscount.value = 0;
 			additionalDiscountPercentage.value = 0;
 			resetDeliveryCharges();
+			resetServiceCharge();
 		}
 
 		touch();
@@ -719,6 +732,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		deliveryCharges,
 		deliveryChargesRate,
 		selectedDeliveryCharge,
+		serviceCharge,
 		// Setters
 		setDiscountAmount,
 		setAdditionalDiscount,
@@ -727,6 +741,8 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		setDeliveryChargesRate,
 		setSelectedDeliveryCharge,
 		resetDeliveryCharges,
+		setServiceCharge,
+		resetServiceCharge,
 	};
 });
 

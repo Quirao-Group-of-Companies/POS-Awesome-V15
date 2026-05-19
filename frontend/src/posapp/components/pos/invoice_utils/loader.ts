@@ -132,6 +132,7 @@ export async function load_invoice(
 				additional_discount: context.additional_discount,
 				additional_discount_percentage:
 					context.additional_discount_percentage,
+				service_charge: context.service_charge,
 			}
 		: null;
 
@@ -153,6 +154,12 @@ export async function load_invoice(
 			context.additional_discount_percentage =
 				stickyData.additional_discount_percentage;
 			context.discount_amount = context.additional_discount;
+		}
+		if (
+			data.posa_service_charge === undefined &&
+			stickyData.service_charge !== undefined
+		) {
+			context.service_charge = stickyData.service_charge;
 		}
 	}
 
@@ -259,6 +266,11 @@ export async function load_invoice(
 			(charge) => charge.name === data.posa_delivery_charges,
 		);
 		context.delivery_charges_rate = data.posa_delivery_charges_rate;
+	}
+	if (data.posa_service_charge !== undefined && data.posa_service_charge !== null) {
+		context.service_charge = context.flt
+			? context.flt(data.posa_service_charge, context.currency_precision)
+			: flt(data.posa_service_charge);
 	}
 	const roundFloat = (value: unknown, fallbackPrecision = 2) => {
 		const precision = Number.isFinite(Number(context.float_precision))

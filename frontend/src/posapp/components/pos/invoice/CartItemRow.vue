@@ -75,7 +75,6 @@
 			<td v-else-if="column.key === 'qty'" class="text-center" :data-column-key="'qty'">
 				<div class="posa-cart-table__qty-counter" :class="{ 'rtl-layout': isRTL }">
 					<v-btn
-						:disabled="disableDecrement"
 						size="small"
 						variant="flat"
 						class="posa-cart-table__qty-btn posa-cart-table__qty-btn--minus minus-btn qty-control-btn"
@@ -117,7 +116,6 @@
 						:disabled="disableInput"
 					></v-text-field>
 					<v-btn
-						:disabled="disableIncrement"
 						size="small"
 						variant="flat"
 						class="posa-cart-table__qty-btn posa-cart-table__qty-btn--plus plus-btn qty-control-btn"

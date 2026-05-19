@@ -102,10 +102,11 @@ export function useCustomerDisplayPublisher({
 		const item_total = items.reduce((sum, row) => sum + row.amount, 0);
 		const additional_discount = toNumber(invoiceStore.additionalDiscount);
 		const delivery_charges = toNumber(invoiceStore.deliveryChargesRate);
+		const service_charge = toNumber(invoiceStore.serviceCharge);
 		const is_return = Boolean(invoiceStore.invoiceDoc?.is_return);
 		const gross_total = is_return ? Math.abs(item_total) : item_total;
 		const discount_magnitude = Math.abs(additional_discount);
-		const subtotal = gross_total - discount_magnitude + delivery_charges;
+		const subtotal = gross_total - discount_magnitude + delivery_charges + service_charge;
 		const total_amount = toFiniteOrNull(subtotal) ?? item_total;
 		const customer_name = getCustomerName(
 			invoiceStore.invoiceDoc,

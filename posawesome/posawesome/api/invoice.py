@@ -15,6 +15,7 @@ from posawesome.posawesome.doctype.delivery_charges.delivery_charges import (
 from posawesome.posawesome.doctype.pos_coupon.pos_coupon import update_coupon_code_count
 
 SUBMISSION_LEDGER_DOCTYPE = "POS Invoice Submission Ledger"
+SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge"
 
 
 def validate(doc, method):
@@ -22,6 +23,7 @@ def validate(doc, method):
     set_patient(doc)
     auto_set_delivery_charges(doc)
     calc_delivery_charges(doc)
+    calc_service_charge(doc)
     apply_tax_inclusive(doc)
 
 
@@ -321,6 +323,62 @@ def calc_delivery_charges(doc):
 
     if calculate_taxes_and_totals:
         doc.calculate_taxes_and_totals()
+
+
+def calc_service_charge(doc):
+    """Mirror delivery charges: store amount on posa_service_charge and add an Actual tax row."""
+    if not doc.company:
+        return
+
+    service_charge = flt(doc.get("posa_service_charge"))
+    calculate_taxes_and_totals = False
+
+    existing_row = next(
+        (
+            row
+            for row in doc.get("taxes", [])
+            if row.charge_type == "Actual"
+            and row.description == SERVICE_CHARGE_TAX_DESCRIPTION
+        ),
+        None,
+    )
+    if existing_row:
+        doc.taxes.remove(existing_row)
+        calculate_taxes_and_totals = True
+
+    if not service_charge:
+        if doc.meta.get_field("posa_service_charge"):
+            doc.posa_service_charge = 0
+        if calculate_taxes_and_totals:
+            doc.calculate_taxes_and_totals()
+        return
+
+    if doc.is_return and service_charge > 0:
+        service_charge = -abs(service_charge)
+
+    if doc.meta.get_field("posa_service_charge"):
+        doc.posa_service_charge = service_charge
+
+    account_head = frappe.get_cached_value(
+        "Company", doc.company, "default_service_charge_account"
+    )
+    if not account_head:
+        frappe.throw(
+            _("Please set Default Service Charge Account in Company {0}").format(doc.company)
+        )
+
+    cost_center = frappe.get_cached_value("Company", doc.company, "cost_center")
+    tax_row = {
+        "charge_type": "Actual",
+        "description": SERVICE_CHARGE_TAX_DESCRIPTION,
+        "tax_amount": service_charge,
+        "account_head": account_head,
+    }
+    if cost_center:
+        tax_row["cost_center"] = cost_center
+
+    doc.append("taxes", tax_row)
+    doc.calculate_taxes_and_totals()
 
 
 def apply_tax_inclusive(doc):

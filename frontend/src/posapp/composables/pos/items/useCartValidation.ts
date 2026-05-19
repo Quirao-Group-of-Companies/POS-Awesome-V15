@@ -22,7 +22,7 @@ export function useCartValidation() {
 		eventBus: any,
 		blockSaleBeyondAvailableQty = false,
 		_showNegativeStockWarning = true,
-		skipServerValidation = false,
+		skipServerValidation = true,
 		isReturnInvoice = false,
 		deferStockValidationToPayment = false,
 	) {
@@ -73,17 +73,17 @@ export function useCartValidation() {
 					requestedQty > item.actual_qty;
 				const blockSale = !allowNegativeStock && exceedsAvailable;
 
-				if (blockSale) {
-					toastStore.show({
-						title: formatStockShortageError(
-							item.item_name || item.item_code,
-							item.actual_qty,
-							requestedQty,
-						),
-						color: "error",
-					});
-					return false;
-				}
+				// if (blockSale) {
+				// 	toastStore.show({
+				// 		title: formatStockShortageError(
+				// 			item.item_name || item.item_code,
+				// 			item.actual_qty,
+				// 			requestedQty,
+				// 		),
+				// 		color: "error",
+				// 	});
+				// 	return false;
+				// }
 
 				if (!skipServerValidation) {
 					const stockValidationResult = await validateStockOnServer(
@@ -92,21 +92,21 @@ export function useCartValidation() {
 						posProfile,
 					);
 
-					if (!stockValidationResult.isValid) {
-						toastStore.show({
-							title: formatStockShortageError(
-								stockValidationResult.data?.item_name ||
-									item.item_name ||
-									item.item_code,
-								stockValidationResult.data?.available_qty ??
-									item.actual_qty,
-								stockValidationResult.data?.requested_qty ??
-									requestedQty,
-							),
-							color: "error",
-						});
-						return false;
-					}
+					// if (!stockValidationResult.isValid) {
+					// 	toastStore.show({
+					// 		title: formatStockShortageError(
+					// 			stockValidationResult.data?.item_name ||
+					// 				item.item_name ||
+					// 				item.item_code,
+					// 			stockValidationResult.data?.available_qty ??
+					// 				item.actual_qty,
+					// 			stockValidationResult.data?.requested_qty ??
+					// 				requestedQty,
+					// 		),
+					// 		color: "error",
+					// 	});
+					// 	return false;
+					// }
 
 					if (
 						_showNegativeStockWarning &&
@@ -232,33 +232,33 @@ export function useCartValidation() {
 				(parseBooleanSetting(stockSettings?.allow_negative_stock) ||
 					parseBooleanSetting(item?.allow_negative_stock));
 
-			if (item.actual_qty < 0 && !allowNegativeStock) {
-				toastStore.show({
-					title: formatStockShortageError(
-						item.item_name || item.item_code,
-						item.actual_qty,
-						requestedQty,
-					),
-					color: "error",
-				});
-				return false;
-			}
+			// if (item.actual_qty < 0 && !allowNegativeStock) {
+			// 	toastStore.show({
+			// 		title: formatStockShortageError(
+			// 			item.item_name || item.item_code,
+			// 			item.actual_qty,
+			// 			requestedQty,
+			// 		),
+			// 		color: "error",
+			// 	});
+			// 	return false;
+			// }
 
-			const exceedsAvailable =
-				typeof item.actual_qty === "number" &&
-				requestedQty > item.actual_qty;
-			const blockSale = !allowNegativeStock && exceedsAvailable;
-			if (blockSale) {
-				toastStore.show({
-					title: formatStockShortageError(
-						item.item_name || item.item_code,
-						item.actual_qty,
-						requestedQty,
-					),
-					color: "error",
-				});
-				return false;
-			}
+			// const exceedsAvailable =
+			// 	typeof item.actual_qty === "number" &&
+			// 	requestedQty > item.actual_qty;
+			// const blockSale = !allowNegativeStock && exceedsAvailable;
+			// if (blockSale) {
+			// 	toastStore.show({
+			// 		title: formatStockShortageError(
+			// 			item.item_name || item.item_code,
+			// 			item.actual_qty,
+			// 			requestedQty,
+			// 		),
+			// 		color: "error",
+			// 	});
+			// 	return false;
+			// }
 		}
 
 		return true;

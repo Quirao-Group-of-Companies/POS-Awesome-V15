@@ -8,6 +8,56 @@ import { _getPlcConversionRate } from "./currency";
 declare const flt: (_value: unknown, _precision?: number) => number;
 declare const frappe: any;
 
+/** Must match SERVICE_CHARGE_TAX_DESCRIPTION in posawesome.posawesome.api.invoice */
+const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
+
+function isServiceChargeTaxRow(tax: any): boolean {
+	return (
+		tax?.charge_type === "Actual" &&
+		tax?.description === SERVICE_CHARGE_TAX_DESCRIPTION
+	);
+}
+
+function buildServiceChargeTaxRow(context: any, serviceCharge: number) {
+	if (!serviceCharge) {
+		return null;
+	}
+
+	const accountHead = context.company?.default_service_charge_account;
+	if (!accountHead) {
+		return null;
+	}
+
+	const conversionRate = context.conversion_rate || 1;
+	return {
+		account_head: accountHead,
+		charge_type: "Actual",
+		description: SERVICE_CHARGE_TAX_DESCRIPTION,
+		tax_amount: serviceCharge,
+		included_in_print_rate: 0,
+		base_tax_amount: serviceCharge * conversionRate,
+	};
+}
+
+function appendServiceChargeTax(
+	doc: any,
+	context: any,
+	serviceCharge: number,
+	grandTotal: number,
+) {
+	const taxRow = buildServiceChargeTaxRow(context, serviceCharge);
+	if (!taxRow) {
+		return grandTotal;
+	}
+
+	doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+	doc.taxes.push(taxRow);
+	doc.total_taxes_and_charges = flt(
+		(doc.total_taxes_and_charges || 0) + serviceCharge,
+	);
+	return grandTotal + serviceCharge;
+}
+
 function normalizeBackendDate(context: any, value: any): string | null {
 	if (value === null || typeof value === "undefined" || value === "") {
 		return null;
@@ -139,6 +189,7 @@ function clearStalePartyFieldsForCustomerChange(
  * - context.posa_coupons
  * - context.selected_delivery_charge
  * - context.delivery_charges_rate
+ * - context.service_charge
  * - context.formatDateForBackend (method)
  */
 
@@ -295,11 +346,20 @@ export function get_invoice_doc(context: any) {
 	// Calculate grand total with correct sign for returns
 	let grandTotal = context.subtotal;
 
+	let serviceCharge = flt(context.service_charge || sourceDoc.posa_service_charge || 0);
+	if (isReturn && serviceCharge > 0) {
+		serviceCharge = -Math.abs(serviceCharge);
+	}
+	doc.posa_service_charge = serviceCharge;
+
 	// Prepare taxes array
 	doc.taxes = [];
 	if (context.invoice_doc && context.invoice_doc.taxes) {
 		let totalTax = 0;
 		context.invoice_doc.taxes.forEach((tax) => {
+			if (isServiceChargeTaxRow(tax)) {
+				return;
+			}
 			if (tax.tax_amount) {
 				grandTotal += flt(tax.tax_amount);
 				totalTax += flt(tax.tax_amount);
@@ -362,6 +422,8 @@ export function get_invoice_doc(context: any) {
 			doc.total_taxes_and_charges = totalTax;
 		}
 	}
+
+	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
 
 	if (isReturn && grandTotal > 0) grandTotal = -Math.abs(grandTotal);
 

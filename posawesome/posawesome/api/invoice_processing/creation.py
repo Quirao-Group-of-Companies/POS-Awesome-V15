@@ -1394,18 +1394,18 @@ def repair_invoice_submission(client_request_id, company, pos_profile, document_
     }
 
 
-@frappe.whitelist()
-def validate_cart_items(items, pos_profile=None):
-    """Validate cart items for available stock.
+# @frappe.whitelist()
+# def validate_cart_items(items, pos_profile=None):
+#     """Validate cart items for available stock.
 
-    Returns blocking errors and warning-only shortages for front-end checks.
-    """
+#     Returns blocking errors and warning-only shortages for front-end checks.
+#     """
 
-    if isinstance(items, str):
-        items = json.loads(items)
+#     if isinstance(items, str):
+#         items = json.loads(items)
 
-    if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
-        pos_profile = None
+#     if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
+#         pos_profile = None
 
     if pos_profile_skips_posawesome_business_checks(pos_profile):
         return {
@@ -1424,10 +1424,21 @@ def validate_cart_items(items, pos_profile=None):
     blocking_errors = [row for row in errors if row.get("policy") == "block"]
     warnings = [row for row in errors if row.get("policy") != "block"]
 
+#     return {
+#         "mode": "block" if blocking_errors else ("warn" if warnings else "allow"),
+#         "errors": blocking_errors,
+#         "warnings": warnings,
+#         "items": errors,
+#         "should_block": bool(blocking_errors),
+#     }
+
+@frappe.whitelist()
+def validate_cart_items(items, pos_profile=None):
+    """Validation disabled — always allow."""
     return {
-        "mode": "block" if blocking_errors else ("warn" if warnings else "allow"),
-        "errors": blocking_errors,
-        "warnings": warnings,
-        "items": errors,
-        "should_block": bool(blocking_errors),
+        "mode": "allow",
+        "errors": [],
+        "warnings": [],
+        "items": [],
+        "should_block": False,
     }

@@ -226,6 +226,7 @@ import { useUIStore } from "../../../stores/uiStore.js";
 import { useInvoiceStore } from "../../../stores/invoiceStore.js";
 import { useItemsStore } from "../../../stores/itemsStore.js";
 import { storeToRefs } from "pinia";
+import { useRoute, useRouter } from "vue-router";
 import { useCustomerDisplayPublisher } from "../../../composables/pos/shared/useCustomerDisplayPublisher";
 
 export default {
@@ -255,6 +256,8 @@ export default {
 			additionalDiscount,
 			additionalDiscountPercentage,
 		} = storeToRefs(invoiceStore);
+		const route = useRoute();
+		const router = useRouter();
 		const usePaymentDialog = computed(() => responsive.windowWidth.value >= 992);
 		const useCompactPosSwitcher = computed(() => responsive.windowWidth.value < 1100);
 		const compactPanel = ref("selector");
@@ -346,10 +349,25 @@ export default {
 			}
 			return value;
 		};
+		const activeTableLabel = computed(() => {
+			return route.query?.table_label || null;
+		});
+		
+		
+
+		const activeTableId = computed(() => {
+			return route.query?.table_id || null;
+		});
+
+		const goBackToTableDashboard = () => {
+			router.push({ path: "/restaurant" });
+		};
+		
 		const additionalDiscountDisplay = ref(normalizeAdditionalDiscountDisplay(additionalDiscount.value));
 		const additionalDiscountPercentageDisplay = ref(
 			normalizeDiscountDisplay(additionalDiscountPercentage.value),
 		);
+
 
 		watch(
 			() => [
@@ -569,6 +587,17 @@ export default {
 			{ immediate: true },
 		);
 
+		onMounted(() => {
+			if (route.query?.table_id) {
+				invoiceStore.mergeInvoiceDoc({
+					restaurant_table: route.query.table_id,
+					restaurant_table_label: route.query.table_label,
+					restaurant_floor: route.query.floor,
+				});
+			}
+		});
+
+
 		return {
 			...responsive,
 			...rtl,
@@ -645,16 +674,9 @@ export default {
 			this.dialog = true;
 		},
 		get_pos_setting() {
-			frappe.db.get_doc("POS Settings", undefined).then((_doc) => {
-				// Update store directly instead of emitting event
-				// If Payments.vue or others need this, they should watch uiStore.posSettings
-				// For now, we assume uiStore.setStockSettings or similar is sufficient,
-				// or we add a new generic settings store.
-				// However, the original code used eventBus.emit("set_pos_settings", doc);
-				// We'll attach it to uiStore if a suitable method exists, or just log for now as
-				// clean separation implies components fetch what they need or use a centralized config store.
-				// Assuming uiStore handles global config:
-				// this.uiStore.setPosSettings(doc); // We might need to implement this if it doesn't exist
+			frappe.db.get_doc("POS Settings", undefined).then((doc) => {
+				this.uiStore.setPosSettings(doc || {});
+				this.eventBus?.emit?.("set_pos_settings", doc || {});
 			});
 		},
 		// handleAddItem removed as ItemsSelector handles pos addition internally

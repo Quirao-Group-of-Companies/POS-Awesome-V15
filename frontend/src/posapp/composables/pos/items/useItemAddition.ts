@@ -961,6 +961,7 @@ export function useItemAddition() {
 			context.base_delivery_charges_rate = 0;
 			context.delivery_charges_rate = 0;
 			context.selected_delivery_charge = null;
+			context.service_charge = 0;
 		}
 
 		context.posa_offers = [];

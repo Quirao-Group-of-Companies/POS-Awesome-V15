@@ -25,6 +25,7 @@ from posawesome.posawesome.api.invoice_processing.stock import (
     _auto_set_return_batches,
     _collect_stock_errors,
 )
+from posawesome.posawesome.api.validation_profile import pos_profile_skips_posawesome_business_checks
 from posawesome.posawesome.api.payment_processing.utils import get_bank_cash_account as get_bank_account
 from posawesome.posawesome.api.utilities import ensure_child_doctype, set_batch_nos_for_bundels
 from posawesome.posawesome.api.payments import redeeming_customer_credit
@@ -453,6 +454,7 @@ def _apply_write_off_settings(invoice_doc, data):
         and remaining_after_write_off > 0.001
         and not allow_partial_payment
         and not is_credit_sale
+        and not pos_profile_skips_posawesome_business_checks(invoice_doc.get("pos_profile"))
     ):
         frappe.throw(
             _(
@@ -746,7 +748,9 @@ def update_invoice(data):
             [d.as_dict() for d in invoice_doc.items],
             doctype=invoice_doc.doctype,
         )
-        if not validation.get("valid"):
+        if not validation.get("valid") and not pos_profile_skips_posawesome_business_checks(
+            invoice_doc.get("pos_profile") or pos_profile
+        ):
             frappe.throw(validation.get("message"))
 
     _validate_return_window(invoice_doc, doctype, return_validity_enabled)
@@ -1402,6 +1406,15 @@ def validate_cart_items(items, pos_profile=None):
 
     if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
         pos_profile = None
+
+    if pos_profile_skips_posawesome_business_checks(pos_profile):
+        return {
+            "mode": "allow",
+            "errors": [],
+            "warnings": [],
+            "items": [],
+            "should_block": False,
+        }
 
     errors = _collect_stock_errors(
         items,

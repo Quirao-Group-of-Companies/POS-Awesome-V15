@@ -4,6 +4,7 @@ from frappe import _
 from erpnext.stock.doctype.batch.batch import get_batch_qty
 from posawesome.posawesome.api.items import get_bulk_stock_availability, get_stock_availability
 from posawesome.posawesome.api.invoice_processing.utils import _sanitize_item_name
+from posawesome.posawesome.api.validation_profile import pos_profile_skips_posawesome_business_checks
 
 
 def _is_stock_item(item):
@@ -167,6 +168,8 @@ def _should_block(pos_profile):
 
 
 def _validate_stock_on_invoice(invoice_doc):
+    if pos_profile_skips_posawesome_business_checks(invoice_doc.get("pos_profile")):
+        return
     if invoice_doc.doctype == "Sales Invoice" and not cint(getattr(invoice_doc, "update_stock", 0)):
         frappe.logger().debug("Skipping stock validation for Sales Invoice without stock update")
         return

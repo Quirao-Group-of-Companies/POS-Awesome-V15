@@ -75,6 +75,8 @@
 					:network-online="networkOnline"
 					:server-online="serverOnline"
 					@close-shift="openCloseShift"
+					@x-reading="$emit('x-reading')"
+					@z-reading="$emit('z-reading')"
 					@sync-invoices="syncPendingInvoices"
 					@open-employee-switch="openEmployeeSwitch"
 					@lock-pos="lockPosScreen"
@@ -1021,6 +1023,8 @@ export default {
 		"nav-click",
 		"change-page",
 		"close-shift",
+		"x-reading",
+		"z-reading",
 		"sync-invoices",
 		"retry-status",
 		"open-customer-display",

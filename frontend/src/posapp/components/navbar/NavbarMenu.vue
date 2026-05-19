@@ -386,6 +386,16 @@ export default {
 		isDesktop() {
 			return this.windowWidth >= 1024;
 		},
+		showXzReadings() {
+			if (!this.isEnabledSetting(this.posProfile?.posa_paluto_mode)) {
+				return false;
+			}
+			const flag = this.posProfile?.posa_enable_xz_readings;
+			if (flag === undefined || flag === null) {
+				return true;
+			}
+			return this.isEnabledSetting(flag);
+		},
 		panelTitle() {
 			return this.activePanel === "settings" ? __("Settings") : __("Quick Actions");
 		},
@@ -430,6 +440,26 @@ export default {
 					tone: "info",
 					handler: "syncInvoices",
 				},
+				this.showXzReadings
+					? {
+							id: "x-reading",
+							label: __("X Reading"),
+							subtitle: __("Interim shift totals (shift stays open)"),
+							icon: "mdi-file-document-outline",
+							tone: "secondary",
+							handler: "xReading",
+						}
+					: null,
+				this.showXzReadings
+					? {
+							id: "z-reading",
+							label: __("Z Reading"),
+							subtitle: __("End-of-shift report with invoice range"),
+							icon: "mdi-file-document-check-outline",
+							tone: "secondary",
+							handler: "zReading",
+						}
+					: null,
 				!this.posProfile?.posa_hide_closing_shift
 					? {
 							id: "close-shift",
@@ -638,6 +668,14 @@ export default {
 				case "closeShift":
 					this.closeMenu();
 					this.$emit("close-shift");
+					break;
+				case "xReading":
+					this.closeMenu();
+					this.$emit("x-reading");
+					break;
+				case "zReading":
+					this.closeMenu();
+					this.$emit("z-reading");
 					break;
 				case "openLanguageDialog":
 					this.closeMenu();
@@ -852,6 +890,8 @@ export default {
 	},
 	emits: [
 		"close-shift",
+		"x-reading",
+		"z-reading",
 		"sync-invoices",
 		"open-employee-switch",
 		"lock-pos",

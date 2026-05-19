@@ -77,9 +77,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
 import { useInvoiceStore } from "@/posapp/stores/invoiceStore";
+import { useUIStore } from "../../stores/uiStore.js";
+import { ensurePosProfile } from "../../../utils/pos_profile";
 
 declare const frappe: any;
 
@@ -95,6 +98,8 @@ type RestaurantTable = {
 
 const router = useRouter();
 const invoiceStore = useInvoiceStore();
+const uiStore = useUIStore();
+const { posProfile } = storeToRefs(uiStore);
 
 const selectedFloor = ref("PALUTO");
 const floors = ref(["PALUTO"]);
@@ -119,8 +124,50 @@ const actions = [
 	{ key: "refresh", label: "REFRESH", icon: "mdi-refresh" },
 ];
 
+function parsePositiveInt(value: unknown, fallback: number): number {
+	const n =
+		typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+	if (!Number.isFinite(n) || n < 1) {
+		return fallback;
+	}
+	return Math.min(n, 500);
+}
+
+function receptionistRoleSet(profile: Record<string, unknown> | null): Set<string> {
+	const raw = profile?.posa_paluto_receptionist_roles;
+	if (typeof raw !== "string" || !raw.trim()) {
+		return new Set(["receptionist"]);
+	}
+	return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+function userHasReceptionistRole(profile: Record<string, unknown> | null): boolean {
+	const roles = profile?.posa_user_roles;
+	if (!Array.isArray(roles)) {
+		return false;
+	}
+	const roleSet = new Set(roles.map((r) => String(r)));
+	for (const need of receptionistRoleSet(profile)) {
+		if (roleSet.has(need)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** Paluto: receptionist ~70 tables, others ~150 when `posa_paluto_mode` is set on POS Profile. */
+const tableSlotCount = computed(() => {
+	const p = posProfile.value as Record<string, unknown> | null;
+	if (!p?.posa_paluto_mode) {
+		return 70;
+	}
+	const recv = parsePositiveInt(p.posa_paluto_receptionist_table_count, 70);
+	const def = parsePositiveInt(p.posa_paluto_default_table_count, 150);
+	return userHasReceptionistRole(p) ? recv : def;
+});
+
 const displayTables = computed(() => {
-	return Array.from({ length: 70 }, (_, index) => {
+	return Array.from({ length: tableSlotCount.value }, (_, index) => {
 		const label = `P-${index + 1}`;
 		const status = tableStatuses.value[label] || "Vacant";
 
@@ -149,8 +196,16 @@ function statusColor(status: RestaurantTableStatus) {
 }
 
 async function fetchTables() {
+	const profile = await ensurePosProfile();
+	if (profile) {
+		uiStore.setPosProfile(profile as any);
+	}
 	// No Restaurant Table DocType exists yet, so keep local table numbers for now.
 }
+
+onMounted(() => {
+	fetchTables();
+});
 
 async function selectTable(table: RestaurantTable) {
 	invoiceStore.mergeInvoiceDoc({

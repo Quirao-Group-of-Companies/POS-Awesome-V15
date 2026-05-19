@@ -173,6 +173,62 @@ export async function cancel_invoice(context: any) {
 	context.cancel_dialog = false;
 }
 
+export async function save_restaurant_order(context: any) {
+	const doc = get_invoice_doc(context);
+	if (!doc?.items?.length) {
+		context.toastStore?.show?.({
+			title: __("Nothing to save"),
+			color: "error",
+		});
+		return null;
+	}
+
+	if (context.invoiceStore?.isRestaurantTableOrder) {
+		doc.restaurant_table =
+			doc.restaurant_table || context.invoiceStore.invoiceDoc?.restaurant_table;
+		doc.restaurant_table_label =
+			doc.restaurant_table_label ||
+			context.invoiceStore.invoiceDoc?.restaurant_table_label;
+		doc.restaurant_floor =
+			doc.restaurant_floor || context.invoiceStore.invoiceDoc?.restaurant_floor;
+		doc.restaurant_order_saved = 1;
+	}
+
+	try {
+		const saved = await context.update_invoice(doc);
+		if (!saved) {
+			context.toastStore?.show?.({
+				title: __("Error saving order"),
+				color: "error",
+			});
+			return null;
+		}
+
+		if (context.invoiceStore?.markRestaurantOrderSaved) {
+			context.invoiceStore.markRestaurantOrderSaved();
+		} else if (context.mergeInvoiceDoc) {
+			context.mergeInvoiceDoc({
+				name: saved.name,
+				restaurant_order_saved: 1,
+			});
+		}
+
+		context.toastStore?.show?.({
+			title: __("Order saved"),
+			summary: doc.restaurant_table_label || doc.restaurant_table || __("Table order"),
+			color: "success",
+		});
+		return saved;
+	} catch (error) {
+		console.error("Error saving restaurant order:", error);
+		context.toastStore?.show?.({
+			title: __("Error saving order"),
+			color: "error",
+		});
+		return null;
+	}
+}
+
 export async function save_and_clear_invoice(context: any) {
 	const { clearInvoice } = getItemAdditionApi();
 	let old_invoice = null;

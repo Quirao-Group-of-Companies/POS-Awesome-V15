@@ -355,6 +355,27 @@ class TestStaleNamedInvoiceHandling(unittest.TestCase):
         base.update(overrides)
         return FakeDoc(**base)
 
+    def test_update_invoice_accepts_dict_payload_from_frappe_call(self):
+        invoice_doc = self._build_invoice_doc()
+        self.creation.frappe.db.exists = lambda doctype, name: False
+        self.creation.frappe.get_doc = lambda data: invoice_doc
+        self.creation.frappe.get_cached_value = lambda *args, **kwargs: 0
+        self.creation._save_draft_with_latest_timestamp = lambda doc: doc
+
+        result = self.creation.update_invoice(
+            {
+                "doctype": "Sales Invoice",
+                "pos_profile": "Main POS",
+                "company": "Test Company",
+                "currency": "USD",
+                "posting_date": "2026-03-21",
+                "items": [],
+                "payments": [],
+            }
+        )
+
+        self.assertEqual(result["docstatus"], 0)
+
     def test_update_invoice_creates_new_draft_when_named_doc_is_submitted(self):
         submitted_doc = self._build_invoice_doc(name="SINV-OLD", docstatus=1)
         fresh_doc = self._build_invoice_doc()

@@ -251,6 +251,7 @@
 			@update:additional_discount_percentage="(val) => (additional_discount_percentage = val)"
 			@update_discount_umount="update_discount_umount"
 			@update:service_charge="updateServiceCharge"
+			@save-order="save_restaurant_order"
 			@save-and-clear="save_and_clear_invoice"
 			@load-drafts="get_draft_invoices"
 			@select-order="get_draft_orders"
@@ -289,7 +290,10 @@ import { useUIStore } from "../../stores/uiStore.js";
 import { storeToRefs } from "pinia";
 import stockCoordinator from "../../utils/stockCoordinator";
 import { getCurrentInstance, ref } from "vue";
-import { save_and_clear_invoice as saveAndClearInvoiceAction } from "./invoice_utils/actions";
+import {
+	save_and_clear_invoice as saveAndClearInvoiceAction,
+	save_restaurant_order as saveRestaurantOrderAction,
+} from "./invoice_utils/actions";
 import { fetchDraftInvoices } from "../../utils/draftInvoices";
 
 // Composables

@@ -33,6 +33,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { POSProfile } from "../types/models";
+import { useItemsStore } from "./itemsStore";
 
 export const useUIStore = defineStore("ui", () => {
   // Loading Overlay State
@@ -171,6 +172,11 @@ export const useUIStore = defineStore("ui", () => {
 
   function setPosProfile(profile: POSProfile) {
     posProfile.value = profile;
+    try {
+      useItemsStore().syncPosProfile(profile);
+    } catch {
+      /* Pinia may not be ready during early boot */
+    }
   }
 
   function setStockSettings(settings: Record<string, any>) {
@@ -192,7 +198,14 @@ export const useUIStore = defineStore("ui", () => {
     company?: any;
     pos_opening_shift?: any;
   }) {
-    if (data.pos_profile) posProfile.value = data.pos_profile;
+    if (data.pos_profile) {
+      posProfile.value = data.pos_profile;
+      try {
+        useItemsStore().syncPosProfile(data.pos_profile);
+      } catch {
+        /* Pinia may not be ready during early boot */
+      }
+    }
     if (data.stock_settings) stockSettings.value = data.stock_settings;
     if (data.pos_settings) posSettings.value = data.pos_settings;
     if (data.company) companyDoc.value = data.company;

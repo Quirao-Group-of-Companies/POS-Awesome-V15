@@ -216,6 +216,7 @@ import Variants from "../items/Variants.vue";
 import Returns from "../flows/Returns.vue";
 import MpesaPayments from "../payments/Mpesa-Payments.vue";
 import { inject, ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue";
+import { useRoute } from "vue-router";
 import { usePosShift } from "../../../composables/pos/shared/usePosShift";
 import { useOffers } from "../../../composables/pos/shared/useOffers";
 // Import the cache cleanup function
@@ -245,7 +246,24 @@ export default {
 		const uiStore = useUIStore();
 		const invoiceStore = useInvoiceStore();
 		const itemsStore = useItemsStore();
+		const route = useRoute();
 		const __ = window.__;
+
+		const applyRestaurantTableFromRoute = () => {
+			const tableId = route.query.table_id;
+			if (!tableId || typeof tableId !== "string") {
+				return;
+			}
+			const savedFlag = route.query.order_saved;
+			invoiceStore.startRestaurantTableSession({
+				name: tableId,
+				label: String(route.query.table_label || tableId),
+				floor: String(route.query.floor || ""),
+			});
+			if (savedFlag === "1" || savedFlag === "true") {
+				invoiceStore.markRestaurantOrderSaved();
+			}
+		};
 		const { activeView, posProfile, paymentDialogOpen } = storeToRefs(uiStore);
 		const {
 			invoiceDoc,
@@ -504,7 +522,15 @@ export default {
 			eventBus,
 		});
 
+		watch(
+			() => route.query.table_id,
+			() => {
+				applyRestaurantTableFromRoute();
+			},
+		);
+
 		onMounted(() => {
+			applyRestaurantTableFromRoute();
 			if (typeof window !== "undefined" && "ResizeObserver" in window) {
 				mobileDockObserver = new ResizeObserver(() => {
 					updateBottomDockHeight();

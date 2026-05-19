@@ -232,6 +232,11 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			? { ...invoiceDoc.value }
 			: ({} as PartialInvoiceDoc);
 		invoiceDoc.value = Object.assign(current, patch || {});
+		if (patch && "restaurant_order_saved" in patch) {
+			restaurantOrderSaved.value = Boolean(
+				Number((patch as PartialInvoiceDoc).restaurant_order_saved) === 1,
+			);
+		}
 		touch();
 	};
 
@@ -249,6 +254,54 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	const deliveryChargesRate = ref(0);
 	const selectedDeliveryCharge = ref("");
 	const serviceCharge = ref(0);
+	const restaurantOrderSaved = ref(false);
+
+	const isRestaurantTableOrder = computed(() => {
+		const table = invoiceDoc.value?.restaurant_table;
+		return typeof table === "string" && table.trim().length > 0;
+	});
+
+	const restaurantSaveOnlyMode = computed(
+		() => isRestaurantTableOrder.value && !restaurantOrderSaved.value,
+	);
+
+	const markRestaurantOrderSaved = () => {
+		restaurantOrderSaved.value = true;
+		mergeInvoiceDoc({ restaurant_order_saved: 1 });
+	};
+
+	const resetRestaurantOrderSaved = () => {
+		restaurantOrderSaved.value = false;
+		if (isRestaurantTableOrder.value) {
+			mergeInvoiceDoc({ restaurant_order_saved: 0 });
+		}
+	};
+
+	const startRestaurantTableSession = (table: {
+		name: string;
+		label?: string;
+		floor?: string;
+	}) => {
+		restaurantOrderSaved.value = false;
+		mergeInvoiceDoc({
+			restaurant_table: table.name,
+			restaurant_table_label: table.label || table.name,
+			restaurant_floor: table.floor || "",
+			restaurant_order_saved: 0,
+		});
+		setInvoiceType("Order");
+	};
+
+	const clearRestaurantSession = () => {
+		restaurantOrderSaved.value = false;
+		const current = invoiceDoc.value ? { ...invoiceDoc.value } : {};
+		delete current.restaurant_table;
+		delete current.restaurant_table_label;
+		delete current.restaurant_floor;
+		delete current.restaurant_order_saved;
+		invoiceDoc.value = Object.keys(current).length ? current : null;
+		touch();
+	};
 	/**
 	 * `true` when `invoiceType` is `"Order"` or `"Quotation"`.
 	 *
@@ -259,8 +312,11 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	 * TODO: verify whether `"Quotation"` actually participates in stock-validation deferral
 	 * in the current backend flow, or whether only `"Order"` does.
 	 */
-	const deferStockValidationToPayment = computed(() =>
-		invoiceType.value === "Order" || invoiceType.value === "Quotation",
+	const deferStockValidationToPayment = computed(
+		() =>
+			invoiceType.value === "Order" ||
+			invoiceType.value === "Quotation" ||
+			isRestaurantTableOrder.value,
 	);
 
 	/**
@@ -609,6 +665,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		invoiceDoc.value = null;
 		flowContext.value = null;
 		flowToLoad.value = null;
+		restaurantOrderSaved.value = false;
 		clearItems();
 		packedItems.value = [];
 
@@ -743,6 +800,13 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		resetDeliveryCharges,
 		setServiceCharge,
 		resetServiceCharge,
+		restaurantOrderSaved,
+		isRestaurantTableOrder,
+		restaurantSaveOnlyMode,
+		markRestaurantOrderSaved,
+		resetRestaurantOrderSaved,
+		startRestaurantTableSession,
+		clearRestaurantSession,
 	};
 });
 

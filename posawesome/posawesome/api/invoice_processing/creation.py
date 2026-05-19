@@ -25,7 +25,6 @@ from posawesome.posawesome.api.invoice_processing.stock import (
     _auto_set_return_batches,
     _collect_stock_errors,
 )
-from posawesome.posawesome.api.validation_profile import pos_profile_skips_posawesome_business_checks
 from posawesome.posawesome.api.payment_processing.utils import get_bank_cash_account as get_bank_account
 from posawesome.posawesome.api.utilities import ensure_child_doctype, set_batch_nos_for_bundels
 from posawesome.posawesome.api.payments import redeeming_customer_credit
@@ -454,7 +453,6 @@ def _apply_write_off_settings(invoice_doc, data):
         and remaining_after_write_off > 0.001
         and not allow_partial_payment
         and not is_credit_sale
-        and not pos_profile_skips_posawesome_business_checks(invoice_doc.get("pos_profile"))
     ):
         frappe.throw(
             _(
@@ -519,6 +517,11 @@ def _apply_manual_posting_controls(payload):
     today = _safe_date_string(nowdate())
     if posting_date and today and posting_date != today:
         payload["set_posting_time"] = 1
+
+
+def _parse_invoice_request_payload(data):
+    """Accept JSON string or dict (frappe.call may pass either)."""
+    return frappe.parse_json(data)
 
 
 def _build_fresh_invoice_payload(data, doctype):
@@ -714,7 +717,7 @@ def _normalize_return_payment_rows(invoice_doc, conversion_rate=1):
 @frappe.whitelist()
 def update_invoice(data):
     currency_cache = {}
-    data = json.loads(data)
+    data = _parse_invoice_request_payload(data)
     client_request_id = extract_invoice_client_request_id(data)
     if not doctype_supports_client_request_id(data.get("doctype") or "Sales Invoice"):
         strip_invoice_client_request_id(data)
@@ -748,9 +751,7 @@ def update_invoice(data):
             [d.as_dict() for d in invoice_doc.items],
             doctype=invoice_doc.doctype,
         )
-        if not validation.get("valid") and not pos_profile_skips_posawesome_business_checks(
-            invoice_doc.get("pos_profile") or pos_profile
-        ):
+        if not validation.get("valid"):
             frappe.throw(validation.get("message"))
 
     _validate_return_window(invoice_doc, doctype, return_validity_enabled)
@@ -941,8 +942,8 @@ def update_invoice(data):
 
 @frappe.whitelist()
 def submit_invoice(invoice, data, submit_in_background=False):
-    data = json.loads(data)
-    invoice = json.loads(invoice)
+    data = _parse_invoice_request_payload(data)
+    invoice = _parse_invoice_request_payload(invoice)
     client_request_id = extract_invoice_client_request_id(invoice, data)
     _sanitize_delivery_dates(invoice)
     _apply_manual_posting_controls(invoice)
@@ -1406,15 +1407,6 @@ def repair_invoice_submission(client_request_id, company, pos_profile, document_
 
 #     if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
 #         pos_profile = None
-
-    if pos_profile_skips_posawesome_business_checks(pos_profile):
-        return {
-            "mode": "allow",
-            "errors": [],
-            "warnings": [],
-            "items": [],
-            "should_block": False,
-        }
 
     errors = _collect_stock_errors(
         items,

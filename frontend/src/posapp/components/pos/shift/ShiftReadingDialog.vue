@@ -99,7 +99,12 @@ import { storeToRefs } from "pinia";
 import { useUIStore } from "../../../stores/uiStore.js";
 import { useShiftReading } from "../../../composables/pos/shift/useShiftReading";
 
-declare const __: (text: string) => string;
+const __ = (text: string, ...args: unknown[]) => {
+	if (typeof window !== "undefined" && typeof window.__ === "function") {
+		return window.__(text, ...args);
+	}
+	return text;
+};
 
 const emit = defineEmits<{
 	(e: "close-shift"): void;

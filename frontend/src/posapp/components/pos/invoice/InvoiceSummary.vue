@@ -97,6 +97,8 @@
 			<v-col cols="12" :md="useCompactSaleDock ? 12 : 5" class="invoice-summary-actions">
 				<InvoiceActionButtons
 					:pos_profile="pos_profile"
+					:restaurant-save-only="restaurantSaveOnlyMode"
+					:restaurant-table-active="restaurantTableActive"
 					:saveLoading="saveLoading"
 					:loadDraftsLoading="loadDraftsLoading"
 					:selectOrderLoading="selectOrderLoading"
@@ -107,6 +109,7 @@
 					:printLoading="printLoading"
 					:paymentLoading="paymentLoading"
 					:customerDisplayLoading="customerDisplayLoading"
+					@save-order="handleSaveOrder"
 					@save-and-clear="handleSaveAndClear"
 					@load-drafts="handleLoadDrafts"
 					@select-order="handleSelectOrder"
@@ -195,6 +198,7 @@ import { storeToRefs } from "pinia";
 import { loadItemSelectorSettings } from "../../../utils/itemSelectorSettings";
 import { useResponsive } from "../../../composables/core/useResponsive";
 import { useUIStore } from "../../../stores/uiStore";
+import { useInvoiceStore } from "../../../stores/invoiceStore";
 import {
 	getAvailableDocumentSources,
 	getDefaultDocumentSource,
@@ -232,6 +236,7 @@ const emit = defineEmits([
 	"update:additional_discount_percentage",
 	"update_discount_umount",
 	"update:service_charge",
+	"save-order",
 	"save-and-clear",
 	"load-drafts",
 	"select-order",
@@ -260,7 +265,12 @@ const desktopDraftsDrawer = ref(false);
 const mobileDraftsDialog = ref(false);
 const responsive = useResponsive();
 const uiStore = useUIStore();
+const invoiceStore = useInvoiceStore();
 const { parkedOrders, draftSource } = storeToRefs(uiStore);
+const { restaurantSaveOnlyMode, isRestaurantTableOrder } = storeToRefs(invoiceStore);
+const restaurantTableActive = computed(
+	() => isRestaurantTableOrder.value && !restaurantSaveOnlyMode.value,
+);
 
 const additionalDiscountDisplay = ref(normalizeAdditionalDiscountDisplay(props.additional_discount));
 const additionalDiscountPercentageDisplay = ref(
@@ -438,6 +448,15 @@ function formatRatio(value) {
 function isFullReturnDiscount(value) {
 	const ratio = Number.isFinite(Number(value)) ? Number(value) : 0;
 	return Math.abs(ratio - 1) < 0.0001;
+}
+
+async function handleSaveOrder() {
+	saveLoading.value = true;
+	try {
+		await emit("save-order");
+	} finally {
+		saveLoading.value = false;
+	}
 }
 
 async function handleSaveAndClear() {

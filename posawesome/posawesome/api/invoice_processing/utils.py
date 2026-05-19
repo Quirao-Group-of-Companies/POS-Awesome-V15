@@ -11,7 +11,6 @@ from frappe.utils import (
 )
 from erpnext.setup.utils import get_exchange_rate
 
-from posawesome.posawesome.api.validation_profile import pos_profile_skips_posawesome_business_checks
 
 
 def _get_return_validity_settings(pos_profile: str | None = None):
@@ -60,8 +59,6 @@ def _set_return_valid_upto(invoice_doc, enabled, default_days):
 
 
 def _validate_return_window(invoice_doc, doctype, enabled):
-    if pos_profile_skips_posawesome_business_checks(invoice_doc.get("pos_profile")):
-        return
     if not enabled or not invoice_doc.is_return or not invoice_doc.get("return_against"):
         return
 

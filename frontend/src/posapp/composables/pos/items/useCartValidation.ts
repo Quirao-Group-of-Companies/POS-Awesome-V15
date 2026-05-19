@@ -44,7 +44,7 @@ export function useCartValidation() {
 				return false;
 			}
 
-			// Allow adding lines in Order/Quotation; enforce stock at Invoice payment/submit stage.
+			// Allow adding lines in Order/Quotation/restaurant table; enforce stock at payment/submit.
 			if (deferStockValidationToPayment && !isReturnInvoice) {
 				return true;
 			}

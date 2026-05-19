@@ -366,15 +366,6 @@ export function useItemAddition() {
 				item.actual_qty <= 0 &&
 				!allowNegativeStock
 			) {
-				console.debug("POS stock gate: item blocked", {
-					item_code: item.item_code,
-					actual_qty: item.actual_qty,
-					block_sale_beyond_available_qty: blockSale,
-					allow_negative_stock: allowNegativeStock,
-					item_allow_negative_stock: parseBooleanSetting(
-						item.allow_negative_stock,
-					),
-				});
 				toastStore.show({
 					title: __("Item is out of stock"),
 					detail: __(

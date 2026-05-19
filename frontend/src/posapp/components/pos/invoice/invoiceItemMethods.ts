@@ -218,6 +218,9 @@ const invoiceItemMethods: Record<string, unknown> &
 	save_and_clear_invoice() {
 		return Actions.save_and_clear_invoice(this);
 	},
+	save_restaurant_order() {
+		return Actions.save_restaurant_order(this);
+	},
 	new_order(data) {
 		return Actions.new_order(this, data);
 	},

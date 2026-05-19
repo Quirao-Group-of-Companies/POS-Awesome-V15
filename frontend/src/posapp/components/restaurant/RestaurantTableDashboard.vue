@@ -208,11 +208,12 @@ onMounted(() => {
 });
 
 async function selectTable(table: RestaurantTable) {
-	invoiceStore.mergeInvoiceDoc({
-		restaurant_table: table.name,
-		restaurant_table_label: table.label,
-		restaurant_floor: table.floor,
-	} as any);
+	invoiceStore.clear();
+	invoiceStore.startRestaurantTableSession({
+		name: table.name,
+		label: table.label,
+		floor: table.floor,
+	});
 	tableStatuses.value = {
 		...tableStatuses.value,
 		[table.label]: "Occupied",

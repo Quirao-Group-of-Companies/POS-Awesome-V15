@@ -510,6 +510,20 @@ export function get_invoice_doc(context: any) {
 	// Add flags to ensure proper rate handling
 	doc.ignore_pricing_rule = 0;
 
+	// Restaurant table session (Paluto) — persist on draft saves
+	const restaurantSource =
+		sourceDoc?.restaurant_table != null && sourceDoc?.restaurant_table !== ""
+			? sourceDoc
+			: context.invoiceStore?.invoiceDoc;
+	if (restaurantSource?.restaurant_table) {
+		doc.restaurant_table = restaurantSource.restaurant_table;
+		doc.restaurant_table_label = restaurantSource.restaurant_table_label;
+		doc.restaurant_floor = restaurantSource.restaurant_floor;
+		if (restaurantSource.restaurant_order_saved !== undefined) {
+			doc.restaurant_order_saved = restaurantSource.restaurant_order_saved ? 1 : 0;
+		}
+	}
+
 	// Preserve the real price list currency
 	doc.price_list_currency = context.price_list_currency;
 	doc.ignore_default_fields = 1; // Add this to prevent default field updates

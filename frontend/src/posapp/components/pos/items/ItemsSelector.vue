@@ -377,7 +377,20 @@ const {
 const flyConfig = reactive({ speed: 0.6, easing: "ease-in-out" });
 
 // 3. Computed Properties
-const pos_profile = computed(() => (itemsIntegration.posProfile.value || {}) as any);
+const pos_profile = computed(() => {
+	const fromItems = itemsIntegration.posProfile.value;
+	const fromUi = uiPosProfile.value;
+	if (!fromItems && !fromUi) {
+		return {} as any;
+	}
+	if (!fromItems) {
+		return (fromUi || {}) as any;
+	}
+	if (!fromUi) {
+		return fromItems as any;
+	}
+	return { ...fromItems, ...fromUi } as any;
+});
 const usesLimitSearch = computed(() =>
 	parseBooleanSetting(pos_profile.value?.posa_use_limit_search ?? pos_profile.value?.pose_use_limit_search),
 );

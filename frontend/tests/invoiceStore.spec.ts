@@ -90,6 +90,18 @@ describe("invoiceStore invoice type state", () => {
 		expect(store.deferStockValidationToPayment).toBe(true);
 	});
 
+	it("defers stock validation for restaurant table orders", () => {
+		const store = useInvoiceStore();
+
+		store.mergeInvoiceDoc({
+			restaurant_table: "Table 1",
+			restaurant_table_label: "Table 1",
+		} as any);
+
+		expect(store.isRestaurantTableOrder).toBe(true);
+		expect(store.deferStockValidationToPayment).toBe(true);
+	});
+
 	it("normalizes a string invoice name into a minimal invoice reference", () => {
 		const store = useInvoiceStore();
 		const invoiceRef: InvoiceDocRef = {

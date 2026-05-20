@@ -2,7 +2,7 @@
 	<v-row dense>
 		<!-- Paluto-style: first visit to table — only Save Order -->
 		<template v-if="restaurantSaveOnly">
-			<v-col cols="12">
+			<v-col cols="12" sm="6">
 				<v-btn
 					block
 					color="warning"
@@ -14,6 +14,19 @@
 					@click="$emit('save-order')"
 				>
 					{{ __("Save Order") }}
+				</v-btn>
+			</v-col>
+			<v-col cols="12" sm="6">
+				<v-btn
+					block
+					color="warning"
+					theme="dark"
+					prepend-icon="mdi-tray-full"
+					@click="$emit('load-drafts')"
+					class="summary-btn restaurant-save-btn"
+					:loading="loadDraftsLoading"
+				>
+					{{ __("Drafts") }}
 				</v-btn>
 			</v-col>
 		</template>
@@ -31,6 +44,19 @@
 					@click="$emit('save-order')"
 				>
 					{{ __("Save Order") }}
+				</v-btn>
+			</v-col>
+			<v-col cols="12">
+				<v-btn
+					block
+					color="warning"
+					theme="dark"
+					prepend-icon="mdi-content-save"
+					@click="$emit('load-drafts')"
+					class="summary-btn restaurant-save-btn"
+					:loading="loadDraftsLoading"
+				>
+					{{ __("Drafts") }}
 				</v-btn>
 			</v-col>
 			<v-col cols="12" sm="6">

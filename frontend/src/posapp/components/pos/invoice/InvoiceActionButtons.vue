@@ -31,27 +31,27 @@
 			</v-col>
 		</template>
 
-		<!-- Paluto-style: order saved — kitchen sent, allow pay / cancel / update order -->
+		<!-- Paluto-style: order saved — 2×2 grid: Save | Drafts / Cancel | Pay -->
 		<template v-else-if="restaurantTableActive">
-			<v-col cols="12">
+			<v-col cols="6">
 				<v-btn
 					block
 					color="warning"
 					theme="dark"
 					prepend-icon="mdi-content-save"
-					class="summary-btn"
+					class="summary-btn restaurant-save-btn"
 					:loading="saveLoading"
 					@click="$emit('save-order')"
 				>
 					{{ __("Save Order") }}
 				</v-btn>
 			</v-col>
-			<v-col cols="12">
+			<v-col cols="6">
 				<v-btn
 					block
 					color="warning"
 					theme="dark"
-					prepend-icon="mdi-content-save"
+					prepend-icon="mdi-tray-full"
 					@click="$emit('load-drafts')"
 					class="summary-btn restaurant-save-btn"
 					:loading="loadDraftsLoading"
@@ -59,7 +59,7 @@
 					{{ __("Drafts") }}
 				</v-btn>
 			</v-col>
-			<v-col cols="12" sm="6">
+			<v-col cols="6">
 				<v-btn
 					block
 					color="error"
@@ -72,7 +72,7 @@
 					{{ __("Cancel Sale") }}
 				</v-btn>
 			</v-col>
-			<v-col cols="12">
+			<v-col cols="6">
 				<v-btn
 					block
 					color="success"

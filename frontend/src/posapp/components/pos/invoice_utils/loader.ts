@@ -4,6 +4,7 @@ import {
 	getCachedCustomerBalance,
 } from "../../../../offline/index";
 import { useDiscounts } from "../../../composables/pos/shared/useDiscounts";
+import { applyRestaurantDefaultCustomer } from "../../../utils/restaurantCustomer";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const flt: (_value: unknown, _precision?: number) => number;
@@ -193,6 +194,11 @@ export async function load_invoice(
 		if (!context.invoiceTypes.includes("Order")) {
 			context.invoiceTypes = ["Invoice", "Order", "Quotation"];
 		}
+	} else if (data.restaurant_table != null && data.restaurant_table !== "") {
+		context.invoiceType = "Order";
+		if (!context.invoiceTypes.includes("Order")) {
+			context.invoiceTypes = ["Invoice", "Order", "Quotation"];
+		}
 	}
 
 	context.invoice_doc = data;
@@ -254,6 +260,7 @@ export async function load_invoice(
 	}
 
 	context.customer = data.customer;
+	applyRestaurantDefaultCustomer(context, data);
 	if (context.set_delivery_charges) await context.set_delivery_charges();
 
 	context.posting_date = context.formatDateForBackend

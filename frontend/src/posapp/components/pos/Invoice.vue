@@ -790,6 +790,9 @@ export default {
 			this.invoiceStore.setFlowContext?.(flow.flow_context || null);
 			const action = flow?.action || flow?.flow_context?.prepared_action;
 			const targetDoctype = flow?.flow_context?.target_doctype || flow?.prepared_doc?.doctype || "";
+			const preparedDoc = flow.prepared_doc || {};
+			const isRestaurantTable =
+				preparedDoc.restaurant_table != null && preparedDoc.restaurant_table !== "";
 
 			if (targetDoctype === "Quotation" || action === "quote_edit_draft") {
 				this.invoiceType = "Quotation";
@@ -797,7 +800,8 @@ export default {
 			} else if (
 				targetDoctype === "Sales Order" ||
 				action === "order_load" ||
-				action === "quote_to_order"
+				action === "quote_to_order" ||
+				isRestaurantTable
 			) {
 				this.invoiceType = "Order";
 				this.invoiceTypes = ["Invoice", "Order", "Quotation"];
@@ -806,7 +810,8 @@ export default {
 				this.invoiceTypes = ["Invoice", "Order", "Quotation"];
 			}
 
-			this.load_invoice(flow.prepared_doc, { preserveStickies: true });
+			this.load_invoice(preparedDoc, { preserveStickies: true });
+			this.invoiceStore.clearFlowToLoad?.();
 		},
 
 		calcProratedReturnDiscount(returnDoc) {
@@ -1029,7 +1034,7 @@ export default {
 					});
 				}
 			},
-			{ deep: false },
+			{ deep: false, immediate: true },
 		);
 
 		this.$watch(

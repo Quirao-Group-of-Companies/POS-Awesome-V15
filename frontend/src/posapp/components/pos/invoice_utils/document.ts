@@ -4,6 +4,7 @@ import {
 	isOffline,
 } from "../../../../offline/index";
 import { _getPlcConversionRate } from "./currency";
+import { getRestaurantDefaultCustomer } from "../../../utils/restaurantCustomer";
 
 declare const flt: (_value: unknown, _precision?: number) => number;
 declare const frappe: any;
@@ -268,8 +269,15 @@ export function get_invoice_doc(context: any) {
 		context.customer_info && typeof context.customer_info === "object"
 			? context.customer_info
 			: {};
-	const resolvedCustomer =
+	let resolvedCustomer =
 		context.customer || customerDetails.customer || doc.customer || null;
+	if (
+		!resolvedCustomer &&
+		doc.restaurant_table != null &&
+		doc.restaurant_table !== ""
+	) {
+		resolvedCustomer = getRestaurantDefaultCustomer(context.pos_profile);
+	}
 	const matchingCustomerDetails =
 		customerDetails?.customer &&
 		resolvedCustomer &&

@@ -228,6 +228,11 @@ import { useInvoiceStore } from "../../../stores/invoiceStore.js";
 import { useItemsStore } from "../../../stores/itemsStore.js";
 import { storeToRefs } from "pinia";
 import { useCustomerDisplayPublisher } from "../../../composables/pos/shared/useCustomerDisplayPublisher";
+import { ensurePosProfile } from "../../../../utils/pos_profile";
+import {
+	resumeRestaurantTableOrder,
+	startNewRestaurantTableSession,
+} from "../../../utils/resumeRestaurantTableOrder";
 
 export default {
 	setup() {
@@ -248,19 +253,58 @@ export default {
 
 		const __ = window.__;
 
-		const applyRestaurantTableFromRoute = () => {
+		const applyRestaurantTableFromRoute = async () => {
 			const tableId = route.query.table_id;
 			if (!tableId || typeof tableId !== "string") {
 				return;
 			}
+			const tableLabel = String(route.query.table_label || tableId);
+			const floor = String(route.query.floor || "");
 			const savedFlag = route.query.order_saved;
-			invoiceStore.startRestaurantTableSession({
-				name: tableId,
-				label: String(route.query.table_label || tableId),
-				floor: String(route.query.floor || ""),
-			});
-			if (savedFlag === "1" || savedFlag === "true") {
-				invoiceStore.markRestaurantOrderSaved();
+			const currentDoc = invoiceStore.invoiceDoc;
+			if (
+				currentDoc?.restaurant_table === tableId &&
+				Array.isArray(invoiceStore.items) &&
+				invoiceStore.items.length > 0
+			) {
+				return;
+			}
+			const profile = posProfile.value || (await ensurePosProfile());
+
+			if (!profile) {
+				startNewRestaurantTableSession(
+					invoiceStore,
+					{ name: tableId, label: tableLabel, floor },
+					savedFlag === "1" || savedFlag === "true",
+				);
+				return;
+			}
+
+			try {
+				const { resumed } = await resumeRestaurantTableOrder({
+					tableId,
+					tableLabel,
+					floor,
+					company: profile.company,
+					posProfile: profile,
+					invoiceStore,
+					uiStore,
+				});
+
+				if (!resumed) {
+					startNewRestaurantTableSession(
+						invoiceStore,
+						{ name: tableId, label: tableLabel, floor },
+						savedFlag === "1" || savedFlag === "true",
+					);
+				}
+			} catch (error) {
+				console.error("Failed to resume restaurant table order from route:", error);
+				startNewRestaurantTableSession(
+					invoiceStore,
+					{ name: tableId, label: tableLabel, floor },
+					savedFlag === "1" || savedFlag === "true",
+				);
 			}
 		};
 		const { activeView, posProfile, paymentDialogOpen } = storeToRefs(uiStore);
@@ -612,17 +656,6 @@ export default {
 			},
 			{ immediate: true },
 		);
-
-		onMounted(() => {
-			if (route.query?.table_id) {
-				invoiceStore.mergeInvoiceDoc({
-					restaurant_table: route.query.table_id,
-					restaurant_table_label: route.query.table_label,
-					restaurant_floor: route.query.floor,
-				});
-			}
-		});
-
 
 		return {
 			...responsive,

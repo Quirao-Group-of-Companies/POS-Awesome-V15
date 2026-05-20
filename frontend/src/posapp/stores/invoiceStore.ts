@@ -27,6 +27,9 @@
 
 import { defineStore } from "pinia";
 import { computed, ref, reactive } from "vue";
+import { getRestaurantDefaultCustomer } from "../utils/restaurantCustomer";
+import { useCustomersStore } from "./customersStore";
+import { useUIStore } from "./uiStore";
 
 declare const frappe: any;
 declare const __: any;
@@ -217,6 +220,11 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		doc: PartialInvoiceDoc | string | null | undefined,
 	) => {
 		invoiceDoc.value = normalizeDoc(doc);
+		if (doc && typeof doc === "object" && "restaurant_order_saved" in doc) {
+			restaurantOrderSaved.value = Boolean(
+				Number((doc as PartialInvoiceDoc).restaurant_order_saved) === 1,
+			);
+		}
 		touch();
 	};
 
@@ -283,12 +291,24 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		floor?: string;
 	}) => {
 		restaurantOrderSaved.value = false;
-		mergeInvoiceDoc({
+		const patch: PartialInvoiceDoc = {
 			restaurant_table: table.name,
 			restaurant_table_label: table.label || table.name,
 			restaurant_floor: table.floor || "",
 			restaurant_order_saved: 0,
-		});
+		};
+		try {
+			const defaultCustomer = getRestaurantDefaultCustomer(
+				useUIStore().posProfile,
+			);
+			if (defaultCustomer) {
+				patch.customer = defaultCustomer;
+				useCustomersStore().setSelectedCustomer(defaultCustomer);
+			}
+		} catch {
+			/* Pinia may not be ready during early boot */
+		}
+		mergeInvoiceDoc(patch);
 		setInvoiceType("Order");
 	};
 
@@ -781,6 +801,9 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		triggerLoadFlow: (flow: any) => {
 			flowContext.value = flow?.flow_context || null;
 			flowToLoad.value = flow?.prepared_doc || flow;
+		},
+		clearFlowToLoad: () => {
+			flowToLoad.value = null;
 		},
 		// Exposed sticky fields
 		discountAmount,

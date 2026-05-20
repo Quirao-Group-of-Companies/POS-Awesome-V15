@@ -3,6 +3,7 @@ import { get_invoice_doc, get_invoice_items, get_payments } from "./document";
 import { _logPriceListDebug, _buildPriceListSnapshot } from "./currency";
 import { applyReturnDiscountProration } from "./item_updates";
 import { prepareDocumentFlowAction } from "../../../utils/documentSources";
+import { applyRestaurantDefaultCustomer } from "../../../utils/restaurantCustomer";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const frappe: any;
@@ -174,6 +175,7 @@ export async function cancel_invoice(context: any) {
 }
 
 export async function save_restaurant_order(context: any) {
+	applyRestaurantDefaultCustomer(context);
 	const doc = get_invoice_doc(context);
 	if (!doc?.items?.length) {
 		context.toastStore?.show?.({

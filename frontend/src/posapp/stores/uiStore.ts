@@ -34,6 +34,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import type { POSProfile } from "../types/models";
 import { useItemsStore } from "./itemsStore";
+import { applyPalutoBranding } from "../utils/palutoBranding";
 
 export const useUIStore = defineStore("ui", () => {
   // Loading Overlay State
@@ -172,6 +173,7 @@ export const useUIStore = defineStore("ui", () => {
 
   function setPosProfile(profile: POSProfile) {
     posProfile.value = profile;
+    applyPalutoBranding(profile);
     try {
       useItemsStore().syncPosProfile(profile);
     } catch {
@@ -200,6 +202,7 @@ export const useUIStore = defineStore("ui", () => {
   }) {
     if (data.pos_profile) {
       posProfile.value = data.pos_profile;
+      applyPalutoBranding(data.pos_profile);
       try {
         useItemsStore().syncPosProfile(data.pos_profile);
       } catch {

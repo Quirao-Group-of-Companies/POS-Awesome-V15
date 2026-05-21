@@ -218,7 +218,7 @@
 }
 
 .posa-cart-table tr:hover {
-	background-color: rgba(25, 118, 210, 0.04);
+	background-color: var(--pos-table-row-hover);
 }
 
 .posa-cart-table tbody tr:nth-child(even) {

@@ -24,9 +24,13 @@
 			<!-- Dynamic padding wrapper -->
 			<div class="dynamic-padding">
 				<v-alert
-					type="info"
+					variant="tonal"
+					color="surface-variant"
+					border="start"
+					border-color="primary"
 					density="compact"
-					class="invoice-status-alert mb-0"
+					icon="mdi-information-outline"
+					class="invoice-status-alert invoice-status-alert--notice mb-0"
 					v-if="pos_profile.create_pos_invoice_instead_of_sales_invoice"
 				>
 					{{ __("Invoices saved as POS Invoices") }}
@@ -1260,6 +1264,24 @@ export default {
 .invoice-status-alert {
 	border-radius: 14px;
 	flex: 0 0 auto;
+}
+
+.invoice-status-alert--notice {
+	background-color: var(--pos-surface-variant, var(--pos-card-bg)) !important;
+	color: var(--pos-text-secondary) !important;
+}
+
+.invoice-status-alert--notice :deep(.v-alert__content) {
+	color: var(--pos-text-primary);
+	font-weight: 500;
+}
+
+.invoice-status-alert--notice :deep(.v-icon) {
+	color: var(--pos-primary) !important;
+}
+
+.invoice-status-alert--notice :deep(.v-alert__border) {
+	opacity: 1;
 }
 
 .invoice-sections {

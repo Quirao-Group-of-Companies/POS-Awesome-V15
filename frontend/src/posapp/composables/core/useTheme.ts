@@ -1,4 +1,10 @@
 import { ref, computed } from "vue";
+import {
+	RESTAURANT_LIGHT_THEME,
+	RESTAURANT_THEME,
+	applyRestaurantDarkCssVars,
+	applyRestaurantLightCssVars,
+} from "../../styles/restaurantTheme";
 
 const THEME_MODES = ["light", "dark", "automatic"] as const;
 type ThemeMode = (typeof THEME_MODES)[number];
@@ -31,6 +37,10 @@ let mediaQueryListenerAttached = false;
  */
 export function setVuetifyInstance(vuetify: VuetifyInstance | null) {
 	vuetifyInstance = vuetify;
+}
+
+export function getVuetifyInstance() {
+	return vuetifyInstance;
 }
 
 /**
@@ -128,62 +138,30 @@ export function useTheme() {
 		const root = document.documentElement;
 
 		if (themeName === "dark") {
-			// Dark theme CSS custom properties
-			root.style.setProperty("--pos-bg-primary", "#121212");
-			root.style.setProperty("--pos-bg-secondary", "#1E1E1E");
-			root.style.setProperty("--pos-bg-tertiary", "#2d2d2d");
-			root.style.setProperty("--pos-surface", "#1E1E1E");
-			root.style.setProperty("--pos-surface-variant", "#373737");
-
+			applyRestaurantDarkCssVars(root);
 			root.style.setProperty("--pos-text-primary", "#ffffff");
 			root.style.setProperty("--pos-text-secondary", "#e0e0e0");
 			root.style.setProperty("--pos-text-disabled", "#9e9e9e");
 			root.style.setProperty("--pos-text-muted", "#b0b8c4");
-
-			root.style.setProperty("--pos-primary", "#00D4FF");
-			root.style.setProperty("--pos-primary-variant", "#00A0CC");
-			root.style.setProperty("--pos-secondary", "#00E5B8");
-
 			root.style.setProperty("--pos-border", "rgba(255, 255, 255, 0.12)");
 			root.style.setProperty("--pos-divider", "#373737");
 			root.style.setProperty("--pos-shadow", "rgba(0, 0, 0, 0.4)");
-
-			root.style.setProperty("--pos-card-bg", "#1E1E1E");
-			root.style.setProperty("--pos-input-bg", "#2d2d2d");
 			root.style.setProperty("--pos-tooltip-bg", "#202833");
 			root.style.setProperty(
 				"--pos-tooltip-border",
 				"rgba(148, 163, 184, 0.2)",
 			);
 			root.style.setProperty("--pos-tooltip-shadow", "rgba(0, 0, 0, 0.4)");
-			root.style.setProperty(
-				"--pos-hover-bg",
-				"rgba(255, 255, 255, 0.12)",
-			);
 			root.style.setProperty("color-scheme", "dark");
 		} else {
-			// Light theme CSS custom properties
-			root.style.setProperty("--pos-bg-primary", "#ffffff");
-			root.style.setProperty("--pos-bg-secondary", "#f8f9fa");
-			root.style.setProperty("--pos-bg-tertiary", "#e3f2fd");
-			root.style.setProperty("--pos-surface", "#ffffff");
-			root.style.setProperty("--pos-surface-variant", "#f5f5f5");
-
+			applyRestaurantLightCssVars(root);
 			root.style.setProperty("--pos-text-primary", "#212121");
 			root.style.setProperty("--pos-text-secondary", "#666666");
 			root.style.setProperty("--pos-text-disabled", "#9e9e9e");
 			root.style.setProperty("--pos-text-muted", "#667085");
-
-			root.style.setProperty("--pos-primary", "#0097A7");
-			root.style.setProperty("--pos-primary-variant", "#00838F");
-			root.style.setProperty("--pos-secondary", "#00BCD4");
-
 			root.style.setProperty("--pos-border", "rgba(0, 0, 0, 0.12)");
 			root.style.setProperty("--pos-divider", "rgba(0, 0, 0, 0.06)");
 			root.style.setProperty("--pos-shadow", "rgba(0, 0, 0, 0.1)");
-
-			root.style.setProperty("--pos-card-bg", "#ffffff");
-			root.style.setProperty("--pos-input-bg", "#f5f5f5");
 			root.style.setProperty("--pos-tooltip-bg", "#ffffff");
 			root.style.setProperty(
 				"--pos-tooltip-border",
@@ -193,14 +171,9 @@ export function useTheme() {
 				"--pos-tooltip-shadow",
 				"rgba(15, 23, 42, 0.14)",
 			);
-			root.style.setProperty(
-				"--pos-hover-bg",
-				"rgba(25, 118, 210, 0.04)",
-			);
 			root.style.setProperty("color-scheme", "light");
 		}
 
-		// Minimal DOM recalculation
 		requestAnimationFrame(() => {
 			root.offsetHeight;
 		});
@@ -296,16 +269,24 @@ export function useTheme() {
 	// Computed properties for common theme values
 	const themeColors = computed(() => {
 		return {
-			background: isDarkMode.value ? "#121212" : "#ffffff",
-			surface: isDarkMode.value ? "#1E1E1E" : "#ffffff",
-			surfaceVariant: isDarkMode.value ? "#2d2d2d" : "#f5f5f5",
-			primary: isDarkMode.value ? "#00D4FF" : "#0097A7",
+			background: isDarkMode.value
+				? RESTAURANT_THEME.background
+				: RESTAURANT_LIGHT_THEME.background,
+			surface: isDarkMode.value
+				? RESTAURANT_THEME.surface
+				: RESTAURANT_LIGHT_THEME.surface,
+			surfaceVariant: isDarkMode.value
+				? RESTAURANT_THEME.surfaceVariant
+				: RESTAURANT_LIGHT_THEME.surfaceVariant,
+			primary: RESTAURANT_THEME.primary,
 			textPrimary: isDarkMode.value ? "#ffffff" : "#212121",
 			textSecondary: isDarkMode.value ? "#e0e0e0" : "#666666",
 			border: isDarkMode.value
 				? "rgba(255, 255, 255, 0.12)"
 				: "rgba(0, 0, 0, 0.12)",
-			cardBackground: isDarkMode.value ? "#1E1E1E" : "#ffffff",
+			cardBackground: isDarkMode.value
+				? RESTAURANT_THEME.surface
+				: RESTAURANT_LIGHT_THEME.surface,
 		};
 	});
 

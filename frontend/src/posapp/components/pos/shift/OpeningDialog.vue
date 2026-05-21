@@ -317,7 +317,7 @@ onMounted(() => {
 	border-radius: 16px;
 	overflow: hidden;
 	background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-	border: 1px solid rgba(25, 118, 210, 0.1);
+	border: 1px solid rgba(211, 47, 47, 0.1);
 	transition: all 0.3s ease;
 	max-height: 90vh;
 	display: flex;
@@ -327,9 +327,9 @@ onMounted(() => {
 /* Header Section - White Background with Blue Text */
 .opening-dialog-header {
 	background: white;
-	color: #1976d2;
+	color: #d32f2f;
 	padding: 16px 24px;
-	border-bottom: 2px solid rgba(25, 118, 210, 0.1);
+	border-bottom: 2px solid rgba(211, 47, 47, 0.1);
 	flex-shrink: 0;
 }
 
@@ -340,7 +340,7 @@ onMounted(() => {
 }
 
 .header-icon-wrapper {
-	background: rgba(25, 118, 210, 0.1);
+	background: rgba(211, 47, 47, 0.1);
 	border-radius: 50%;
 	padding: 8px;
 	display: flex;
@@ -351,7 +351,7 @@ onMounted(() => {
 
 .header-icon {
 	font-size: 20px;
-	color: #1976d2;
+	color: #d32f2f;
 }
 
 .header-text {
@@ -363,7 +363,7 @@ onMounted(() => {
 	font-weight: 600;
 	margin: 0;
 	line-height: 1.2;
-	color: #1976d2;
+	color: #d32f2f;
 }
 
 .header-subtitle {
@@ -371,7 +371,7 @@ onMounted(() => {
 	opacity: 0.8;
 	margin: 2px 0 0 0;
 	line-height: 1.3;
-	color: #1976d2;
+	color: #d32f2f;
 }
 
 /* Content Section - Optimized for minimal scrolling */
@@ -392,12 +392,12 @@ onMounted(() => {
 	gap: 6px;
 	font-size: 1rem;
 	font-weight: 600;
-	color: #1976d2;
+	color: #d32f2f;
 	margin-bottom: 0;
 }
 
 .section-icon {
-	color: #1976d2;
+	color: #d32f2f;
 	font-size: 18px;
 }
 
@@ -415,7 +415,7 @@ onMounted(() => {
 }
 
 .field-focused {
-	background: rgba(25, 118, 210, 0.02);
+	background: rgba(211, 47, 47, 0.02);
 	border-radius: 8px;
 }
 
@@ -424,7 +424,7 @@ onMounted(() => {
 	border-radius: 8px;
 	overflow: hidden;
 	box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
-	border: 1px solid rgba(25, 118, 210, 0.1);
+	border: 1px solid rgba(211, 47, 47, 0.1);
 }
 
 .enhanced-table-compact :deep(.v-data-table__wrapper) {
@@ -433,9 +433,9 @@ onMounted(() => {
 
 .enhanced-table-compact :deep(th) {
 	background: linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%);
-	color: #1976d2;
+	color: #d32f2f;
 	font-weight: 600;
-	border-bottom: 1px solid rgba(25, 118, 210, 0.1);
+	border-bottom: 1px solid rgba(211, 47, 47, 0.1);
 	padding: 8px 12px;
 }
 
@@ -444,7 +444,7 @@ onMounted(() => {
 }
 
 .enhanced-table-compact :deep(tr:hover) {
-	background: rgba(25, 118, 210, 0.04);
+	background: rgba(211, 47, 47, 0.04);
 }
 
 /* Amount Editor - Compact */
@@ -459,7 +459,7 @@ onMounted(() => {
 	/* Add this to center the content horizontally */
 	gap: 4px;
 	padding: 4px 8px;
-	background: rgba(25, 118, 210, 0.05);
+	background: rgba(211, 47, 47, 0.05);
 	border-radius: 6px;
 	transition: all 0.3s ease;
 	cursor: pointer;
@@ -467,13 +467,13 @@ onMounted(() => {
 }
 
 .amount-display-compact:hover {
-	background: rgba(25, 118, 210, 0.1);
+	background: rgba(211, 47, 47, 0.1);
 	transform: scale(1.01);
 }
 
 .currency-symbol {
 	font-weight: 600;
-	color: #1976d2;
+	color: #d32f2f;
 	font-size: 0.9rem;
 }
 
@@ -623,21 +623,21 @@ onMounted(() => {
 
 /* Focus and Interaction States */
 .enhanced-field :deep(.v-field--focused) {
-	box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+	box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.1);
 }
 
 .enhanced-table-compact :deep(.v-data-table-row--clickable:hover) {
-	background: rgba(25, 118, 210, 0.04) !important;
+	background: rgba(211, 47, 47, 0.04) !important;
 }
 
 /* Enhanced focus states for form fields */
 .enhanced-field :deep(.v-field--focused .v-field__outline) {
-	border-color: rgba(25, 118, 210, 0.3) !important;
+	border-color: rgba(211, 47, 47, 0.3) !important;
 	border-width: 1px !important;
 }
 
 .enhanced-field :deep(.v-field--focused .v-field__overlay) {
-	background: rgba(25, 118, 210, 0.02);
+	background: rgba(211, 47, 47, 0.02);
 }
 
 /* Action buttons with improved naming and styling */
@@ -675,7 +675,7 @@ onMounted(() => {
 }
 
 .logout-action-btn {
-	background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%) !important;
+	background: linear-gradient(135deg, #1e88e5 0%, #b71c1c 100%) !important;
 }
 
 .logout-action-btn:hover {

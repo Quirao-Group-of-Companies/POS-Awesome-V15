@@ -2,6 +2,10 @@ import { createVuetify } from "vuetify";
 import * as components from "vuetify/components";
 import * as directives from "vuetify/directives";
 import "@mdi/font/css/materialdesignicons.css";
+import {
+	RESTAURANT_LIGHT_THEME,
+	RESTAURANT_THEME,
+} from "../styles/restaurantTheme";
 
 const THEME_STORAGE_KEY = "posawesome_theme_preference";
 
@@ -56,7 +60,8 @@ const resolveInitialThemeMode = () => {
 		}
 	}
 
-	return "automatic";
+	/* Restaurant POS defaults to dark shell */
+	return "dark";
 };
 
 const resolveInitialTheme = () => {
@@ -82,21 +87,21 @@ bootstrapThemeAttributes();
 const lightTheme = {
 	dark: false,
 	colors: {
-		background: "#FFFFFF",
-		surface: "#FFFFFF",
-		"surface-variant": "#f5f5f5",
+		background: RESTAURANT_LIGHT_THEME.background,
+		surface: RESTAURANT_LIGHT_THEME.surface,
+		"surface-variant": RESTAURANT_LIGHT_THEME.surfaceVariant,
 		"surface-bright": "#ffffff",
 		"surface-light": "#fafafa",
-		primary: "#0097a7",
-		"primary-variant": "#00838f",
-		secondary: "#00bcd4",
-		"secondary-variant": "#0097a7",
-		accent: "#ff6b35",
-		"accent-variant": "#e55a2b",
-		success: "#66bb6a",
-		warning: "#ff9800",
-		error: "#e86674",
-		info: "#2196f3",
+		primary: RESTAURANT_LIGHT_THEME.primary,
+		"primary-variant": RESTAURANT_LIGHT_THEME.primaryVariant,
+		secondary: RESTAURANT_LIGHT_THEME.secondary,
+		"secondary-variant": "#E53935",
+		accent: RESTAURANT_LIGHT_THEME.accent,
+		"accent-variant": "#FF6E63",
+		success: RESTAURANT_LIGHT_THEME.success,
+		warning: RESTAURANT_LIGHT_THEME.warning,
+		error: RESTAURANT_LIGHT_THEME.error,
+		info: RESTAURANT_LIGHT_THEME.info,
 		outline: "rgba(0, 0, 0, 0.2)",
 		"on-primary": "#ffffff",
 		"on-secondary": "#ffffff",
@@ -113,27 +118,27 @@ const lightTheme = {
 const darkTheme = {
 	dark: true,
 	colors: {
-		background: "#121212",
-		surface: "#1E1E1E",
-		"surface-variant": "#373737",
-		"surface-bright": "#242b33",
-		"surface-light": "#1a2028",
-		primary: "#00D4FF",
-		"primary-variant": "#00A0CC",
-		secondary: "#00E5B8",
-		"secondary-variant": "#00b894",
-		accent: "#ff6b35",
-		"accent-variant": "#e55a2b",
-		success: "#4caf50",
-		warning: "#ffc107",
-		error: "#f44336",
-		info: "#2196f3",
-		outline: "rgba(255, 255, 255, 0.2)",
-		"on-primary": "#000000",
-		"on-secondary": "#000000",
-		"on-background": "#ffffff",
-		"on-surface": "#ffffff",
-		"on-surface-variant": "#ffffff",
+		background: RESTAURANT_THEME.background,
+		surface: RESTAURANT_THEME.surface,
+		"surface-variant": RESTAURANT_THEME.surfaceVariant,
+		"surface-bright": RESTAURANT_THEME.surfaceBright,
+		"surface-light": RESTAURANT_THEME.surfaceLight,
+		primary: RESTAURANT_THEME.primary,
+		"primary-variant": RESTAURANT_THEME.primaryVariant,
+		secondary: RESTAURANT_THEME.secondary,
+		"secondary-variant": RESTAURANT_THEME.secondaryVariant,
+		accent: RESTAURANT_THEME.accent,
+		"accent-variant": RESTAURANT_THEME.accentVariant,
+		success: RESTAURANT_THEME.success,
+		warning: RESTAURANT_THEME.warning,
+		error: RESTAURANT_THEME.error,
+		info: RESTAURANT_THEME.info,
+		outline: RESTAURANT_THEME.outline,
+		"on-primary": RESTAURANT_THEME.onPrimary,
+		"on-secondary": RESTAURANT_THEME.onSecondary,
+		"on-background": RESTAURANT_THEME.onBackground,
+		"on-surface": RESTAURANT_THEME.onSurface,
+		"on-surface-variant": RESTAURANT_THEME.onSurface,
 		"on-error": "#ffffff",
 		"on-warning": "#000000",
 		"on-info": "#ffffff",

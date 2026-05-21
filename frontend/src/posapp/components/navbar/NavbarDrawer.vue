@@ -13,14 +13,14 @@
 		<div class="drawer-shell">
 			<div>
 				<div v-if="!mini" class="drawer-header">
-					<v-avatar size="40">
-						<v-img :src="companyImg" alt="Company logo" />
+					<v-avatar size="48" rounded="lg">
+						<v-img :src="companyImg" alt="Company logo" cover />
 					</v-avatar>
 					<span class="drawer-company">{{ company }}</span>
 				</div>
 				<div v-else class="drawer-header-mini">
-					<v-avatar size="40">
-						<v-img :src="companyImg" alt="Company logo" />
+					<v-avatar size="48" rounded="lg">
+						<v-img :src="companyImg" alt="Company logo" cover />
 					</v-avatar>
 				</div>
 
@@ -201,7 +201,7 @@ function closeDrawer() {
 	flex: 1;
 	font-weight: 500;
 	font-size: 1rem;
-	color: #0097a7;
+	color: #d32f2f;
 	font-family: "Roboto", sans-serif;
 }
 
@@ -222,7 +222,7 @@ function closeDrawer() {
 
 /* Hover effect for all list items in the navigation drawer */
 .v-list-item:hover {
-	background-color: rgba(25, 118, 210, 0.08) !important;
+	background-color: rgba(211, 47, 47, 0.08) !important;
 }
 
 .drawer-footer {
@@ -260,7 +260,7 @@ function closeDrawer() {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
 	flex-shrink: 0;
 }
 
@@ -284,8 +284,8 @@ function closeDrawer() {
 
 /* Styling for the actively selected list item in the navigation drawer */
 .active-item {
-	background-color: rgba(25, 118, 210, 0.12) !important;
-	border-right: 3px solid #1976d2;
+	background-color: rgba(211, 47, 47, 0.12) !important;
+	border-right: 3px solid #d32f2f;
 }
 
 /* Theme-aware drawer styling */

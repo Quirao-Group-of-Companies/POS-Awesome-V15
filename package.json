@@ -68,7 +68,7 @@
   },
   "build": {
     "appId": "com.posawesome.desktop",
-    "productName": "POS Awesome Desktop",
+    "productName": "Paluto POS",
     "asar": true,
     "publish": [],
     "directories": {

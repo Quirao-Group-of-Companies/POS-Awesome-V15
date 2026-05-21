@@ -4,6 +4,7 @@ import {
 	isPalutoMode,
 	PALUTO_BRAND,
 } from "./palutoBrand";
+import { installPwaBranding, PWA_APP_NAME } from "./pwaBranding";
 
 export {
 	getNavbarBrandParts,
@@ -68,8 +69,9 @@ export function applyPalutoBranding(profile: unknown) {
 
 	if (enabled) {
 		applyPalutoCssVariables(resolvedTheme);
+		installPwaBranding();
 		if (document.title.includes("POS Awesome")) {
-			document.title = document.title.replace(/POS Awesome/g, "PALUTO POS");
+			document.title = document.title.replace(/POS Awesome/g, PWA_APP_NAME);
 		}
 	} else {
 		root.setAttribute("data-paluto-mode", "0");

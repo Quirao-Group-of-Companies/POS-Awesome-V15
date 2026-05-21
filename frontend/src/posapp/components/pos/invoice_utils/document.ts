@@ -4,7 +4,6 @@ import {
 	isOffline,
 } from "../../../../offline/index";
 import { _getPlcConversionRate } from "./currency";
-import { getRestaurantDefaultCustomer } from "../../../utils/restaurantCustomer";
 
 declare const flt: (_value: unknown, _precision?: number) => number;
 declare const frappe: any;
@@ -202,7 +201,11 @@ export function get_invoice_doc(context: any) {
 	if (sourceDoc.name) {
 		doc = { ...sourceDoc };
 	}
-
+	doc.custom_customer_count = 
+		sourceDoc.custom_customer_count ?? 
+		context.invoiceStore?.invoiceDoc?.custom_customer_count ?? 
+		1;
+		
 	// Always set these fields first
 	if (context.invoiceType === "Quotation") {
 		doc.doctype = "Quotation";
@@ -269,15 +272,8 @@ export function get_invoice_doc(context: any) {
 		context.customer_info && typeof context.customer_info === "object"
 			? context.customer_info
 			: {};
-	let resolvedCustomer =
+	const resolvedCustomer =
 		context.customer || customerDetails.customer || doc.customer || null;
-	if (
-		!resolvedCustomer &&
-		doc.restaurant_table != null &&
-		doc.restaurant_table !== ""
-	) {
-		resolvedCustomer = getRestaurantDefaultCustomer(context.pos_profile);
-	}
 	const matchingCustomerDetails =
 		customerDetails?.customer &&
 		resolvedCustomer &&

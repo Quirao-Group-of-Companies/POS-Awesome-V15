@@ -164,7 +164,7 @@ export const useUIStore = defineStore("ui", () => {
 
   /** Service charge percent from POS Settings (e.g. 5 = 5%). Defaults to 5. */
   const serviceChargePercent = computed(() => {
-    const raw = Number(posSettings.value?.service_charge_percent);
+    const raw = Number(posSettings.value?.custom_service_charge_percent);
     return Number.isFinite(raw) && raw >= 0 ? raw : 5;
   });
 

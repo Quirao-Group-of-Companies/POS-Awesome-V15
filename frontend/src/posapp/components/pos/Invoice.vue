@@ -47,6 +47,15 @@
 								:invoiceTypes="invoiceTypes"
 								v-model="invoiceType"
 							/>
+						</v-card >
+
+						<v-card flat class="invoice-sections pos-themed-card">
+							<div class="invoice-section-heading">
+								<h3 class="invoice-section-heading__title">{{ __("Customer Count") }}</h3>
+							</div>
+							<CustomerCount
+								ref="customerCount"
+							/>
 						</v-card>
 
 						<v-card
@@ -274,6 +283,7 @@
 import format from "../../format";
 import InvoiceCustomerSection from "./invoice/InvoiceCustomerSection.vue";
 import DeliveryCharges from "./invoice/DeliveryCharges.vue";
+import CustomerCount from "./invoice/CustomerCount.vue";
 import PostingDateRow from "./invoice/PostingDateRow.vue";
 import MultiCurrencyRow from "./invoice/MultiCurrencyRow.vue";
 import CancelSaleDialog from "./invoice/CancelSaleDialog.vue";
@@ -426,18 +436,19 @@ export default {
 	},
 
 	components: {
-		InvoiceCustomerSection,
-		DeliveryCharges,
-		PostingDateRow,
-		MultiCurrencyRow,
-		InvoiceSummary,
-		CancelSaleDialog,
-		ItemsTable,
-		InvoiceItemsActionToolbar,
-		PackedItemsDialog,
-		PaymentConfirmationDialog,
-		PriceListRateDialog,
-	},
+    InvoiceCustomerSection,
+    DeliveryCharges,
+    CustomerCount,
+    PostingDateRow,
+    MultiCurrencyRow,
+    InvoiceSummary,
+    CancelSaleDialog,
+    ItemsTable,
+    InvoiceItemsActionToolbar,
+    PackedItemsDialog,
+    PaymentConfirmationDialog,
+    PriceListRateDialog,
+},
 	computed: {
 		items: {
 			get() {

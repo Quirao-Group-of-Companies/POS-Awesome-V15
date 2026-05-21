@@ -65,10 +65,59 @@
 			</div>
 		</div>
 
+		<div
+			v-if="tableContext"
+			:class="['pos-navbar-table-context', isRtl ? 'rtl-table-context' : 'ltr-table-context']"
+			:aria-label="tableContextAriaLabel"
+		>
+			<template v-if="!isMobile">
+				<div class="pos-navbar-table-context__segment">
+					<span class="pos-navbar-table-context__label">{{ __("Table") }}</span>
+					<strong class="pos-navbar-table-context__value">{{ tableContext.label }}</strong>
+				</div>
+				<span class="pos-navbar-table-context__divider" aria-hidden="true">|</span>
+				<div class="pos-navbar-table-context__segment">
+					<span class="pos-navbar-table-context__label">{{ __("TXN") }}</span>
+					<strong class="pos-navbar-table-context__value">{{ tableContext.txn }}</strong>
+				</div>
+				<span class="pos-navbar-table-context__divider" aria-hidden="true">|</span>
+				<div class="pos-navbar-table-context__segment">
+					<span class="pos-navbar-table-context__label">{{ __("Type") }}</span>
+					<strong class="pos-navbar-table-context__value">{{ tableContext.typeLabel }}</strong>
+				</div>
+			</template>
+			<template v-else>
+				<strong class="pos-navbar-table-context__value">{{ tableContext.label }}</strong>
+				<span class="pos-navbar-table-context__divider" aria-hidden="true">|</span>
+				<span class="pos-navbar-table-context__value pos-navbar-table-context__value--muted">{{
+					tableContext.txn
+				}}</span>
+			</template>
+		</div>
+
 		<v-spacer />
 
 		<!-- Actions Section (right in LTR, left in RTL) -->
 		<div :class="['pos-navbar-actions-section', isRtl ? 'rtl-actions-section' : 'ltr-actions-section']">
+			<v-btn
+				v-if="showBackToTables"
+				variant="flat"
+				color="primary"
+				:size="isMobile ? 'small' : 'default'"
+				:class="[
+					'pos-back-to-tables-btn',
+					isRtl ? 'rtl-back-to-tables-btn' : 'ltr-back-to-tables-btn',
+				]"
+				:prepend-icon="isRtl ? undefined : 'mdi-arrow-left'"
+				:append-icon="isRtl ? 'mdi-arrow-right' : undefined"
+				:aria-label="__('Back to restaurant tables')"
+				@click="goBackToTables"
+			>
+				<span class="pos-back-to-tables-btn__label">
+					{{ isMobile ? __("Tables") : __("Back to Tables") }}
+				</span>
+			</v-btn>
+
 			<!-- Mobile: Show only essential items, others in menu -->
 			<template v-if="isMobile">
 				<!-- Always visible status indicator -->
@@ -245,7 +294,11 @@
 </template>
 
 <script>
+import { computed } from "vue";
+import { storeToRefs } from "pinia";
+import { useRoute, useRouter } from "vue-router";
 import { useRtl } from "../../composables/core/useRtl";
+import { useInvoiceStore } from "../../stores/invoiceStore";
 import posLogo from "../pos/pos.png";
 import NavbarInfoGadgets from "./NavbarInfoGadgets.vue";
 import {
@@ -259,13 +312,95 @@ export default {
 	components: {
 		NavbarInfoGadgets,
 	},
-	setup() {
+	setup(props) {
 		const { isRtl, rtlStyles, rtlClasses } = useRtl();
+		const router = useRouter();
+		const route = useRoute();
+		const invoiceStore = useInvoiceStore();
+		const { isRestaurantTableOrder, invoiceDoc, invoiceType } = storeToRefs(invoiceStore);
+		const translate =
+			typeof window !== "undefined" && typeof window.__ === "function"
+				? window.__
+				: (text) => text;
+
+		const formatTableTypeLabel = (type) => {
+			if (type === "Order") {
+				return translate("Order");
+			}
+			if (type === "Quotation") {
+				return translate("Quotation");
+			}
+			if (type === "Invoice") {
+				return translate("Invoice");
+			}
+			return type || translate("Order");
+		};
+
+		const tableContext = computed(() => {
+			if (route.path !== "/pos") {
+				return null;
+			}
+
+			const doc = invoiceDoc.value;
+			const label = String(
+				doc?.restaurant_table_label ||
+					route.query.table_label ||
+					doc?.restaurant_table ||
+					route.query.table_id ||
+					"",
+			).trim();
+
+			if (!label) {
+				return null;
+			}
+
+			const txn = String(doc?.name || "").trim() || translate("New");
+			const typeLabel = formatTableTypeLabel(invoiceType.value);
+
+			return {
+				label,
+				txn,
+				typeLabel,
+			};
+		});
+
+		const tableContextAriaLabel = computed(() => {
+			if (!tableContext.value) {
+				return "";
+			}
+			return translate("Table {0}, transaction {1}, type {2}", [
+				tableContext.value.label,
+				tableContext.value.txn,
+				tableContext.value.typeLabel,
+			]);
+		});
+
+		const showBackToTables = computed(() => {
+			if (route.path !== "/pos") {
+				return false;
+			}
+			if (checkPalutoMode(props.posProfile)) {
+				return true;
+			}
+			return (
+				isRestaurantTableOrder.value ||
+				(typeof route.query.table_id === "string" && route.query.table_id.length > 0)
+			);
+		});
+
+		const goBackToTables = () => {
+			router.push({ path: "/tables" });
+		};
+
 		return {
 			isRtl,
 			rtlStyles,
 			rtlClasses,
 			posLogoFallback: posLogo,
+			showBackToTables,
+			goBackToTables,
+			tableContext,
+			tableContextAriaLabel,
 		};
 	},
 	data() {
@@ -578,6 +713,82 @@ export default {
 
 .pos-navbar-enhanced:hover {
 	box-shadow: 0 4px 20px var(--pos-shadow) !important;
+}
+
+/* Active table context — centered between brand and actions */
+.pos-navbar-table-context {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1 1 auto;
+	gap: 10px;
+	min-width: 0;
+	padding: 0 8px;
+	color: var(--pos-text-secondary);
+	white-space: nowrap;
+}
+
+.pos-navbar-table-context__segment {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	min-width: 0;
+}
+
+.pos-navbar-table-context__label {
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--pos-text-secondary);
+}
+
+.pos-navbar-table-context__value {
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: var(--pos-primary);
+	line-height: 1.2;
+}
+
+.pos-navbar-table-context__divider {
+	color: var(--pos-border);
+	font-weight: 300;
+	user-select: none;
+}
+
+.pos-back-to-tables-btn {
+	flex-shrink: 0;
+	text-transform: none;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	border-radius: var(--pos-radius-sm, 10px) !important;
+}
+
+.pos-back-to-tables-btn__label {
+	white-space: nowrap;
+}
+
+.pos-navbar-table-context__value--muted {
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: var(--pos-text-primary);
+}
+
+@media (max-width: 768px) {
+	.pos-back-to-tables-btn {
+		padding-inline: 10px !important;
+		min-width: 0;
+	}
+
+	.pos-navbar-table-context {
+		gap: 6px;
+		padding: 0 4px;
+		flex: 0 1 auto;
+	}
+
+	.pos-navbar-table-context__value {
+		font-size: 0.82rem;
+	}
 }
 
 /* Logo — height-based sizing so wide marks stay crisp in the app bar */

@@ -411,20 +411,6 @@ export default {
 			}
 			return value;
 		};
-		const activeTableLabel = computed(() => {
-			return route.query?.table_label || null;
-		});
-		
-		
-
-		const activeTableId = computed(() => {
-			return route.query?.table_id || null;
-		});
-
-		const goBackToTableDashboard = () => {
-			router.push({ path: "/restaurant" });
-		};
-		
 		const additionalDiscountDisplay = ref(normalizeAdditionalDiscountDisplay(additionalDiscount.value));
 		const additionalDiscountPercentageDisplay = ref(
 			normalizeDiscountDisplay(additionalDiscountPercentage.value),

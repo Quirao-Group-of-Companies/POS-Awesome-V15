@@ -15,7 +15,7 @@
 					/>
 				</v-col>
 
-				<v-col cols="12" md="4" class="legend-wrap my-3 my-md-0">
+				<v-col cols="12" md="8" class="legend-wrap my-3 my-md-0">
 					<div
 						v-for="item in legend"
 						:key="item.status"
@@ -27,19 +27,6 @@
 						/>
 						<span>{{ item.label }}</span>
 					</div>
-				</v-col>
-
-				<v-col cols="12" md="5" class="action-wrap">
-					<v-btn
-						v-for="action in actions"
-						:key="action.label"
-						size="small"
-						class="action-btn"
-						:prepend-icon="action.icon"
-						@click="handleAction(action.key)"
-					>
-						{{ action.label }}
-					</v-btn>
 				</v-col>
 			</v-row>
 		</v-card>
@@ -120,19 +107,6 @@ const legend = [
 	{ label: "VACANT", status: "Vacant" as RestaurantTableStatus },
 	{ label: "OCCUPIED", status: "Occupied" as RestaurantTableStatus },
 	{ label: "BILL-CUT", status: "Bill-Cut" as RestaurantTableStatus },
-];
-
-const actions = [
-	{
-		key: "customer_time_info",
-		label: "CUSTOMER TIME INFO",
-		icon: "mdi-clock-outline",
-	},
-	{ key: "reservation", label: "RESERVATION", icon: "mdi-calendar-check" },
-	{ key: "payment_form", label: "PAYMENT FORM", icon: "mdi-credit-card-outline" },
-	{ key: "manage_table", label: "MANAGE TABLE", icon: "mdi-table-chair" },
-	{ key: "manage_item", label: "MANAGE ITEM", icon: "mdi-food" },
-	{ key: "refresh", label: "REFRESH", icon: "mdi-refresh" },
 ];
 
 function parsePositiveInt(value: unknown, fallback: number): number {
@@ -315,31 +289,6 @@ async function selectTable(table: RestaurantTable) {
 
 	await router.push({ path: "/pos", query: routeQuery });
 }
-
-function handleAction(key: string) {
-	if (key === "refresh") {
-		fetchTables();
-		return;
-	}
-
-	if (key === "manage_table") {
-		frappe.show_alert({
-			message: "Restaurant Table DocType is not created yet.",
-			indicator: "orange",
-		});
-		return;
-	}
-
-	if (key === "manage_item") {
-		frappe.set_route("List", "Item");
-		return;
-	}
-
-	frappe.show_alert({
-		message: `${key.replaceAll("_", " ")} is not wired yet.`,
-		indicator: "blue",
-	});
-}
 </script>
 
 <style scoped>
@@ -383,21 +332,6 @@ function handleAction(key: string) {
 	height: 18px;
 	border-radius: 4px;
 	border: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-.action-wrap {
-	display: flex;
-	justify-content: flex-end;
-	gap: 8px;
-	flex-wrap: wrap;
-}
-
-.action-btn {
-	background: linear-gradient(180deg, #2f88d8, #1669ad);
-	color: #fff;
-	font-size: 11px;
-	font-weight: 700;
-	border-radius: 10px;
 }
 
 .table-grid {
@@ -466,10 +400,6 @@ function handleAction(key: string) {
 }
 
 @media (max-width: 960px) {
-	.action-wrap {
-		justify-content: flex-start;
-	}
-
 	.table-card {
 		width: 76px;
 		height: 56px;

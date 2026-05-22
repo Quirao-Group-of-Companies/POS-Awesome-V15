@@ -185,9 +185,6 @@ const syncMetaToStore = () => {
         custom_special_discount_name: discountName.value,
         custom_special_discount_id_number: discountID.value,
     });
-
-    console.log("invoice Store", invoiceStore.invoiceDoc);
-    
 };
 
 // Apply discount to totals and payment lines

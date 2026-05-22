@@ -41,35 +41,28 @@ function buildServiceChargeTaxRow(context: any, serviceCharge: number) {
 }
 
 function buildSpecialDiscountTaxRow(context: any, discountAmount: number) {
-    if (!discountAmount) {
-        return null;
-    }
+    if (!discountAmount || discountAmount === 0) return null;
 
     const invoice_doc = context?.invoice_doc;
     const discount_type = invoice_doc?.custom_special_discount_type;
-
-    if (!discount_type) {
-        return null;
-    }
+    if (!discount_type) return null;
 
     const accountMap: Record<string, string> = {
         "Senior Citizen": context.company?.custom_default_senior_citizen_account,
         "PWD": context.company?.custom_default_pwd_account,
     };
-
-    const accountHead = accountMap[discount_type];  // ← use discount_type, not context.discount_type
-    if (!accountHead) {
-        return null;
-    }
+    const accountHead = accountMap[discount_type];
+    if (!accountHead) return null;
 
     const conversionRate = context.conversion_rate || 1;
+
     return {
         account_head: accountHead,
         charge_type: "Actual",
         description: "Special Discount",
-        tax_amount: discountAmount,
+        tax_amount: discountAmount,                      // -42 → backend subtracts it
         included_in_print_rate: 0,
-        base_tax_amount: discountAmount * conversionRate,
+        base_tax_amount: discountAmount * conversionRate, // -42
     };
 }
 
@@ -100,25 +93,22 @@ function appendServiceChargeTax(
 }
 
 function appendSpecialDiscount(
-	doc: any,
-	context: any,
-	DiscountAmount: number,
-	grandTotal: number,
+    doc: any,
+    context: any,
+    DiscountAmount: number,   // always negative, e.g. -42
+    grandTotal: number,
 ) {
-	const taxRow = buildSpecialDiscountTaxRow(context, DiscountAmount);
-	if (!taxRow) {
-		return grandTotal;
-	}
-
-	doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
-	doc.taxes.push(taxRow);
-	doc.total_taxes_and_charges = flt(
-		(doc.total_taxes_and_charges || 0) + DiscountAmount,
-	);
-
-	console.log("taxes", doc.taxes);
-	
-	return grandTotal + DiscountAmount;
+    const taxRow = buildSpecialDiscountTaxRow(context, DiscountAmount);
+    if (!taxRow) {
+        return grandTotal;
+    }
+    doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+    doc.taxes.push(taxRow);
+    // DiscountAmount is negative, so this correctly REDUCES total_taxes_and_charges
+    doc.total_taxes_and_charges = flt(
+        (doc.total_taxes_and_charges || 0) + DiscountAmount,
+    );
+    return grandTotal + DiscountAmount;  // 210 + (-42) = 168, then +10 = 178... wait
 }
 
 function normalizeBackendDate(context: any, value: any): string | null {
@@ -263,6 +253,12 @@ export function get_invoice_doc(context: any) {
 
 	if (sourceDoc.name) {
 		doc = { ...sourceDoc };
+
+		if (Array.isArray(doc.taxes)) {
+			doc.taxes = doc.taxes.filter(
+				(tax: any) => !isServiceChargeTaxRow(tax) && !isSpecialDiscountTaxRow(tax)
+			);
+		}
 	}
 	doc.custom_customer_count = 
 		sourceDoc.custom_customer_count ?? 
@@ -414,7 +410,10 @@ export function get_invoice_doc(context: any) {
 	let grandTotal = context.subtotal;
 
 	let serviceCharge = flt(context.service_charge || sourceDoc.posa_service_charge || 0);
-	let specialDiscountAmount = -(flt(context.invoice_doc?.custom_special_discount_amount || sourceDoc.custom_special_discount_amount || 0));
+	let specialDiscountAmount = -Math.abs(flt(
+		context.invoice_doc?.custom_special_discount_amount ||
+		sourceDoc.custom_special_discount_amount || 0
+	));
 	if (isReturn && serviceCharge > 0) {
 		serviceCharge = -Math.abs(serviceCharge);
 	}
@@ -495,8 +494,8 @@ export function get_invoice_doc(context: any) {
 		}
 	}
 
-	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
 	grandTotal = appendSpecialDiscount(doc, context, specialDiscountAmount, grandTotal);
+	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
 	if (context.invoiceStore?.invoiceDoc) {
 		context.invoiceStore.invoiceDoc.taxes = [...doc.taxes];
 	}
@@ -655,8 +654,6 @@ export function get_invoice_doc(context: any) {
 			}
 		});
 	}
-	console.log("doc",doc);
-	
 	return doc;
 }
 

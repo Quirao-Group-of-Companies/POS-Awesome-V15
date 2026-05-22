@@ -318,7 +318,6 @@ export default {
 			additionalDiscountPercentage,
 		} = storeToRefs(invoiceStore);
 
-		const router = useRouter();
 		const route = useRoute();
 		const usePaymentDialog = computed(() => responsive.windowWidth.value >= 992);
 		const useCompactPosSwitcher = computed(() => responsive.windowWidth.value < 1100);

@@ -126,7 +126,6 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		let tQty = 0;
 		let tGross = 0;
 		let tDisc = 0;
-		console.log("itemsData",itemsData);
 		
 		for (const item of Array.from(itemsData.values())) {
 			const qty = toNumber(item.qty);

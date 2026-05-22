@@ -7,7 +7,7 @@
         hide-details
         variant="solo"
         class="pos-themed-input"
-        :label="__('Customer Count')"
+        :label="__('Count')"
       />
     </div>
   </template>

@@ -1,3 +1,4 @@
+import type { AnyMxRecord } from "node:dns";
 import {
 	getTaxTemplate,
 	getTaxInclusiveSetting,
@@ -39,6 +40,46 @@ function buildServiceChargeTaxRow(context: any, serviceCharge: number) {
 	};
 }
 
+function buildSpecialDiscountTaxRow(context: any, discountAmount: number) {
+    if (!discountAmount) {
+        return null;
+    }
+
+    const invoice_doc = context?.invoice_doc;
+    const discount_type = invoice_doc?.custom_special_discount_type;
+
+    if (!discount_type) {
+        return null;
+    }
+
+    const accountMap: Record<string, string> = {
+        "Senior Citizen": context.company?.custom_default_senior_citizen_account,
+        "PWD": context.company?.custom_default_pwd_account,
+    };
+
+    const accountHead = accountMap[discount_type];  // ← use discount_type, not context.discount_type
+    if (!accountHead) {
+        return null;
+    }
+
+    const conversionRate = context.conversion_rate || 1;
+    return {
+        account_head: accountHead,
+        charge_type: "Actual",
+        description: "Special Discount",
+        tax_amount: discountAmount,
+        included_in_print_rate: 0,
+        base_tax_amount: discountAmount * conversionRate,
+    };
+}
+
+function isSpecialDiscountTaxRow(tax: any): boolean {
+    return (
+        tax?.charge_type === "Actual" &&
+        tax?.description === "Special Discount"
+    );
+}
+
 function appendServiceChargeTax(
 	doc: any,
 	context: any,
@@ -56,6 +97,28 @@ function appendServiceChargeTax(
 		(doc.total_taxes_and_charges || 0) + serviceCharge,
 	);
 	return grandTotal + serviceCharge;
+}
+
+function appendSpecialDiscount(
+	doc: any,
+	context: any,
+	DiscountAmount: number,
+	grandTotal: number,
+) {
+	const taxRow = buildSpecialDiscountTaxRow(context, DiscountAmount);
+	if (!taxRow) {
+		return grandTotal;
+	}
+
+	doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+	doc.taxes.push(taxRow);
+	doc.total_taxes_and_charges = flt(
+		(doc.total_taxes_and_charges || 0) + DiscountAmount,
+	);
+
+	console.log("taxes", doc.taxes);
+	
+	return grandTotal + DiscountAmount;
 }
 
 function normalizeBackendDate(context: any, value: any): string | null {
@@ -351,10 +414,12 @@ export function get_invoice_doc(context: any) {
 	let grandTotal = context.subtotal;
 
 	let serviceCharge = flt(context.service_charge || sourceDoc.posa_service_charge || 0);
+	let specialDiscountAmount = -(flt(context.invoice_doc?.custom_special_discount_amount || sourceDoc.custom_special_discount_amount || 0));
 	if (isReturn && serviceCharge > 0) {
 		serviceCharge = -Math.abs(serviceCharge);
 	}
 	doc.posa_service_charge = serviceCharge;
+	doc.custom_special_discount_amount = specialDiscountAmount;
 
 	// Prepare taxes array
 	doc.taxes = [];
@@ -362,6 +427,9 @@ export function get_invoice_doc(context: any) {
 		let totalTax = 0;
 		context.invoice_doc.taxes.forEach((tax) => {
 			if (isServiceChargeTaxRow(tax)) {
+				return;
+			}
+			if (isSpecialDiscountTaxRow(tax)) {
 				return;
 			}
 			if (tax.tax_amount) {
@@ -428,6 +496,10 @@ export function get_invoice_doc(context: any) {
 	}
 
 	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
+	grandTotal = appendSpecialDiscount(doc, context, specialDiscountAmount, grandTotal);
+	if (context.invoiceStore?.invoiceDoc) {
+		context.invoiceStore.invoiceDoc.taxes = [...doc.taxes];
+	}
 
 	if (isReturn && grandTotal > 0) grandTotal = -Math.abs(grandTotal);
 
@@ -583,7 +655,8 @@ export function get_invoice_doc(context: any) {
 			}
 		});
 	}
-
+	console.log("doc",doc);
+	
 	return doc;
 }
 

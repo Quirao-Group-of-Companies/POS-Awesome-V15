@@ -144,6 +144,9 @@
 							"
 							@new-address="new_address"
 						/>
+						<PaymentSpecialDiscountDetails
+							:invoice-doc="invoice_doc"
+						/>
 						<PaymentPurchaseOrder
 							:invoice-doc="invoice_doc"
 							:pos-profile="pos_profile"
@@ -323,6 +326,7 @@ import PaymentCustomerCreditDetails from "./payments/PaymentCustomerCreditDetail
 import PaymentOptions from "./payments/PaymentOptions.vue";
 import PaymentSelectionFields from "./payments/PaymentSelectionFields.vue";
 import PaymentDialogs from "./payments/PaymentDialogs.vue";
+import PaymentSpecialDiscountDetails from "./payments/PaymentSpecialDiscountDetails.vue";
 
 const props = defineProps({
 	dialogMode: {

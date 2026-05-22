@@ -169,7 +169,7 @@ export const useUIStore = defineStore("ui", () => {
   });
 
   /** Decimal rate applied to subtotal (e.g. 0.05 for 5%). */
-  const serviceChargeRate = computed(() => serviceChargePercent.value / 100);
+  const serviceChargeRate = computed(() => Math.abs(serviceChargePercent.value / 100));
 
   function setPosProfile(profile: POSProfile) {
     posProfile.value = profile;

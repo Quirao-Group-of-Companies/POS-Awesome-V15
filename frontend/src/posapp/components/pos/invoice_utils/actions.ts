@@ -236,10 +236,6 @@ export async function save_and_clear_invoice(context: any) {
 	let old_invoice = null;
 	const doc = get_invoice_doc(context);
     // Log these instead
-    console.log("invoiceStore invoiceDoc", context.invoiceStore.invoiceDoc);
-    console.log("custom_customer_count from store", context.invoiceStore.invoiceDoc?.custom_customer_count);
-    console.log("doc built", doc);
-    console.log("custom_customer_count from doc", doc?.custom_customer_count);
 	try {
 		if (doc.name) {
 			old_invoice = await context.update_invoice(doc);

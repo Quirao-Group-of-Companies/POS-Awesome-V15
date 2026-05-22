@@ -296,9 +296,9 @@ const resolvedServiceChargeRate = computed(() => {
 const serviceChargeLabel = computed(() => {
 	const percent = Number(props.service_charge_percent);
 	const displayPercent =
-		Number.isFinite(percent) && percent >= 0
+		Math.round(Number.isFinite(percent) && percent >= 0
 			? percent
-			: resolvedServiceChargeRate.value * 100;
+			: resolvedServiceChargeRate.value * 100);
 	return __("Service Charge ({0}%)", [displayPercent]);
 });
 

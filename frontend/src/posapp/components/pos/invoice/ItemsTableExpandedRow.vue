@@ -1,9 +1,9 @@
 <template>
-	<td :colspan="colspan" class="ma-0 pa-0 posa-expanded-row-cell">
+	<component :is="rootTag" v-bind="rootAttrs">
 		<div
-			v-if="isExpanded"
+			v-if="showContent"
 			class="posa-expanded-content responsive-expanded-content"
-			:class="expandedContentClasses"
+			:class="[expandedContentClasses, { 'posa-expanded-content--panel': layout === 'panel' }]"
 		>
 			<!-- Item Details Form -->
 			<div class="posa-item-details-form">
@@ -426,14 +426,16 @@
 				<div class="text-caption mt-2">{{ __("Loading details...") }}</div>
 			</div>
 		</div>
-	</td>
+	</component>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import { getDisplayableBatchOptions } from "../../../composables/pos/shared/useBatchSerial";
 import type { CartItem, POSProfile, InvoiceDoc } from "../../../types/models";
 
 interface Props {
+	layout?: "row" | "panel";
 	item: CartItem | any;
 	isExpanded: boolean;
 	colspan: number;
@@ -461,7 +463,17 @@ interface Props {
 	validateDueDate: (_item: any) => void;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+	layout: "row",
+});
+
+const rootTag = computed(() => (props.layout === "panel" ? "div" : "td"));
+const rootAttrs = computed(() =>
+	props.layout === "panel"
+		? { class: "posa-item-details-panel" }
+		: { colspan: props.colspan, class: "ma-0 pa-0 posa-expanded-row-cell" },
+);
+const showContent = computed(() => props.layout === "panel" || props.isExpanded);
 
 const emit = defineEmits<{
 	"qty-change": [item: CartItem, event: any];
@@ -479,5 +491,13 @@ const getBatchOptions = (item: any) => getDisplayableBatchOptions(item?.batch_no
 </script>
 
 <style scoped>
-/* Local styles specific to the expanded content component only */
+.posa-item-details-panel {
+	width: 100%;
+}
+
+.posa-expanded-content--panel {
+	padding: 0;
+	background: transparent;
+	box-shadow: none;
+}
 </style>

@@ -746,7 +746,7 @@ export default {
 .pos-navbar-table-context__value {
 	font-size: 0.95rem;
 	font-weight: 700;
-	color: var(--pos-primary);
+	color: rgba(255, 255, 255, 0.96);
 	line-height: 1.2;
 }
 
@@ -771,7 +771,7 @@ export default {
 .pos-navbar-table-context__value--muted {
 	font-size: 0.82rem;
 	font-weight: 600;
-	color: var(--pos-text-primary);
+	color: rgba(255, 255, 255, 0.88);
 }
 
 @media (max-width: 768px) {

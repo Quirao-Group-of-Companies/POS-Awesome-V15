@@ -1,8 +1,8 @@
 <template>
-	<v-row dense>
-		<!-- Paluto-style: first visit to table — only Save Order -->
+	<v-row dense class="invoice-action-buttons">
+		<!-- Paluto-style: first visit to table — Save Order + secondary Drafts -->
 		<template v-if="restaurantSaveOnly">
-			<v-col cols="12" sm="6">
+			<v-col cols="12" sm="7">
 				<v-btn
 					block
 					color="warning"
@@ -16,28 +16,29 @@
 					{{ __("Save Order") }}
 				</v-btn>
 			</v-col>
-			<v-col cols="12" sm="6">
+			<v-col cols="12" sm="5">
 				<v-btn
 					block
-					color="warning"
-					theme="dark"
+					variant="outlined"
+					color="surface-variant"
 					prepend-icon="mdi-tray-full"
-					@click="$emit('load-drafts')"
-					class="summary-btn restaurant-save-btn"
+					class="summary-btn drafts-btn"
 					:loading="loadDraftsLoading"
+					@click="$emit('load-drafts')"
 				>
 					{{ __("Drafts") }}
 				</v-btn>
 			</v-col>
 		</template>
 
-		<!-- Paluto-style: order saved — 2×2 grid: Save | Drafts / Cancel | Pay -->
+		<!-- Paluto-style: order saved — Save + Cancel, then Drafts, then dominant PAY -->
 		<template v-else-if="restaurantTableActive">
 			<v-col cols="6">
 				<v-btn
 					block
 					color="warning"
 					theme="dark"
+					size="large"
 					prepend-icon="mdi-content-save"
 					class="summary-btn restaurant-save-btn"
 					:loading="saveLoading"
@@ -49,37 +50,38 @@
 			<v-col cols="6">
 				<v-btn
 					block
-					color="warning"
-					theme="dark"
-					prepend-icon="mdi-tray-full"
-					@click="$emit('load-drafts')"
-					class="summary-btn restaurant-save-btn"
-					:loading="loadDraftsLoading"
-				>
-					{{ __("Drafts") }}
-				</v-btn>
-			</v-col>
-			<v-col cols="6">
-				<v-btn
-					block
 					color="error"
+					variant="flat"
 					theme="dark"
 					prepend-icon="mdi-close-circle"
-					class="summary-btn"
+					class="summary-btn cancel-sale-btn text-white"
 					:loading="cancelLoading"
 					@click="$emit('cancel-sale')"
 				>
 					{{ __("Cancel Sale") }}
 				</v-btn>
 			</v-col>
-			<v-col cols="6">
+			<v-col cols="12">
+				<v-btn
+					block
+					variant="outlined"
+					color="surface-variant"
+					prepend-icon="mdi-tray-full"
+					class="summary-btn drafts-btn"
+					:loading="loadDraftsLoading"
+					@click="$emit('load-drafts')"
+				>
+					{{ __("Drafts") }}
+				</v-btn>
+			</v-col>
+			<v-col cols="12" class="invoice-action-buttons__pay-col">
 				<v-btn
 					block
 					color="success"
 					theme="dark"
-					size="large"
+					size="x-large"
 					prepend-icon="mdi-credit-card"
-					class="summary-btn pay-btn"
+					class="summary-btn pay-btn pay-btn--hero"
 					:loading="paymentLoading"
 					@click="$emit('show-payment')"
 				>
@@ -96,9 +98,9 @@
 					color="accent"
 					theme="dark"
 					prepend-icon="mdi-content-save"
-					@click="$emit('save-and-clear')"
 					class="summary-btn"
 					:loading="saveLoading"
+					@click="$emit('save-and-clear')"
 				>
 					{{ __("Save & Clear") }}
 				</v-btn>
@@ -106,12 +108,12 @@
 			<v-col cols="12" sm="6">
 				<v-btn
 					block
-					color="warning"
-					theme="dark"
+					variant="outlined"
+					color="surface-variant"
 					prepend-icon="mdi-tray-full"
-					@click="$emit('load-drafts')"
-					class="white-text-btn summary-btn"
+					class="summary-btn drafts-btn"
 					:loading="loadDraftsLoading"
+					@click="$emit('load-drafts')"
 				>
 					{{ __("Drafts") }}
 				</v-btn>
@@ -120,11 +122,12 @@
 				<v-btn
 					block
 					color="info"
+					variant="tonal"
 					theme="dark"
 					prepend-icon="mdi-book-search"
-					@click="$emit('select-order')"
-					class="summary-btn"
+					class="summary-btn secondary-action-btn"
 					:loading="selectOrderLoading"
+					@click="$emit('select-order')"
 				>
 					{{ __("Select S.O") }}
 				</v-btn>
@@ -133,11 +136,12 @@
 				<v-btn
 					block
 					color="deep-purple"
+					variant="tonal"
 					theme="dark"
 					prepend-icon="mdi-folder-search-outline"
-					@click="$emit('open-invoice-management')"
-					class="summary-btn"
+					class="summary-btn secondary-action-btn"
 					:loading="invoiceManagementLoading"
+					@click="$emit('open-invoice-management')"
 				>
 					{{ __("Invoice Mgmt") }}
 				</v-btn>
@@ -146,11 +150,12 @@
 				<v-btn
 					block
 					color="error"
+					variant="flat"
 					theme="dark"
 					prepend-icon="mdi-close-circle"
-					@click="$emit('cancel-sale')"
-					class="summary-btn"
+					class="summary-btn cancel-sale-btn text-white"
 					:loading="cancelLoading"
+					@click="$emit('cancel-sale')"
 				>
 					{{ __("Cancel Sale") }}
 				</v-btn>
@@ -160,11 +165,12 @@
 				<v-btn
 					block
 					color="secondary"
+					variant="tonal"
 					theme="dark"
 					prepend-icon="mdi-backup-restore"
-					@click="$emit('open-returns')"
-					class="summary-btn"
+					class="summary-btn secondary-action-btn"
 					:loading="returnsLoading"
+					@click="$emit('open-returns')"
 				>
 					{{ __("Sales Return") }}
 				</v-btn>
@@ -173,11 +179,12 @@
 				<v-btn
 					block
 					color="primary"
+					variant="tonal"
 					theme="dark"
 					prepend-icon="mdi-printer"
-					@click="$emit('print-draft')"
-					class="summary-btn"
+					class="summary-btn secondary-action-btn"
 					:loading="printLoading"
+					@click="$emit('print-draft')"
 				>
 					{{ __("Print Draft") }}
 				</v-btn>
@@ -186,25 +193,26 @@
 				<v-btn
 					block
 					color="indigo"
+					variant="tonal"
 					theme="dark"
 					prepend-icon="mdi-monitor"
-					@click="$emit('open-customer-display')"
-					class="summary-btn"
+					class="summary-btn secondary-action-btn"
 					:loading="customerDisplayLoading"
+					@click="$emit('open-customer-display')"
 				>
 					{{ __("Customer Screen") }}
 				</v-btn>
 			</v-col>
-			<v-col cols="12">
+			<v-col cols="12" class="invoice-action-buttons__pay-col">
 				<v-btn
 					block
 					color="success"
 					theme="dark"
-					size="large"
+					size="x-large"
 					prepend-icon="mdi-credit-card"
-					@click="$emit('show-payment')"
-					class="summary-btn pay-btn"
+					class="summary-btn pay-btn pay-btn--hero"
 					:loading="paymentLoading"
+					@click="$emit('show-payment')"
 				>
 					{{ __("PAY") }}
 				</v-btn>
@@ -262,12 +270,12 @@ const showCustomerDisplayButton = computed(() =>
 </script>
 
 <style scoped>
-.white-text-btn {
-	color: var(--pos-text-primary) !important;
+.invoice-action-buttons {
+	width: 100%;
 }
 
-.white-text-btn :deep(.v-btn__content) {
-	color: var(--pos-text-primary) !important;
+.invoice-action-buttons__pay-col {
+	margin-top: 4px;
 }
 
 .summary-btn {
@@ -276,12 +284,6 @@ const showCustomerDisplayButton = computed(() =>
 	overflow: hidden;
 	min-height: 46px !important;
 	text-transform: none !important;
-}
-
-.restaurant-save-btn {
-	font-weight: 700 !important;
-	font-size: 1.05rem !important;
-	min-height: 52px !important;
 }
 
 .summary-btn :deep(.v-btn__content) {
@@ -294,16 +296,64 @@ const showCustomerDisplayButton = computed(() =>
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
 }
 
-.pay-btn {
-	font-weight: 600 !important;
-	font-size: 1.1rem !important;
-	background: linear-gradient(135deg, #4caf50, #45a049) !important;
-	box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3) !important;
+.restaurant-save-btn {
+	font-weight: 700 !important;
+	font-size: 1.05rem !important;
+	min-height: 52px !important;
 }
 
-.pay-btn:hover {
-	background: linear-gradient(135deg, #45a049, #3d8b40) !important;
-	box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4) !important;
+.secondary-action-btn {
+	min-height: 48px !important;
+	font-weight: 600 !important;
+}
+
+.secondary-action-btn:hover {
+	transform: none;
+	box-shadow: none !important;
+}
+
+.drafts-btn {
+	min-height: 44px !important;
+	font-weight: 500 !important;
+	font-size: 0.95rem !important;
+	border-color: rgba(var(--v-theme-on-surface), 0.28) !important;
+	color: var(--pos-text-secondary, rgba(255, 255, 255, 0.72)) !important;
+	background: transparent !important;
+}
+
+.drafts-btn :deep(.v-btn__content),
+.drafts-btn :deep(.v-icon) {
+	color: var(--pos-text-secondary, rgba(255, 255, 255, 0.72)) !important;
+}
+
+.drafts-btn:hover {
+	transform: none;
+	box-shadow: none !important;
+	background: rgba(var(--v-theme-on-surface), 0.06) !important;
+}
+
+.pay-btn--hero {
+	font-weight: 800 !important;
+	font-size: 1.35rem !important;
+	letter-spacing: 0.06em;
+	min-height: 64px !important;
+	background: linear-gradient(135deg, #43a047, #2e7d32) !important;
+	box-shadow: 0 6px 20px rgba(46, 125, 50, 0.45) !important;
+}
+
+.pay-btn--hero:hover {
+	background: linear-gradient(135deg, #388e3c, #1b5e20) !important;
+	box-shadow: 0 8px 24px rgba(46, 125, 50, 0.55) !important;
 	transform: translateY(-2px);
+}
+
+.pay-btn--hero :deep(.v-icon) {
+	font-size: 1.5rem !important;
+}
+
+.cancel-sale-btn,
+.cancel-sale-btn :deep(.v-btn__content),
+.cancel-sale-btn :deep(.v-icon) {
+	color: #ffffff !important;
 }
 </style>

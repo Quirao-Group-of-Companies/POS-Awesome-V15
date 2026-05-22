@@ -224,6 +224,10 @@ import { useBarcodeIndexing } from "../../../composables/pos/items/useBarcodeInd
 import { useScanProcessor } from "../../../composables/pos/items/useScanProcessor";
 import { useItemCurrency } from "../../../composables/pos/items/useItemCurrency";
 import { startItemsSelectorInitialization } from "../../../composables/pos/items/useItemsSelectorInitialization";
+import {
+	loadItemSelectorSettings,
+	saveItemSelectorSettings,
+} from "../../../utils/itemSelectorSettings";
 import { registerItemsSelectorEvents } from "../../../composables/pos/items/useItemsSelectorEvents";
 import { registerItemsSelectorTypeToSearch } from "../../../composables/pos/items/useItemsSelectorTypeToSearch";
 import { useItemsSelectorLayoutLifecycle } from "../../../composables/pos/items/useItemsSelectorLayoutLifecycle";
@@ -325,7 +329,7 @@ const {
 // 2. Local State & Settings
 const search_input = ref("");
 const first_search = ref("");
-const items_view = ref("list");
+const items_view = ref<"card" | "list">("card");
 const itemsPerPage = ref(50);
 const clearingSearch = ref(false);
 const isDragging = ref(false);
@@ -342,6 +346,14 @@ const item_group = computed({
 });
 const virtualScrollBuffer = ref(200);
 const localStorageAvailable = ref(true);
+
+watch(items_view, (mode) => {
+	if (!localStorageAvailable.value) {
+		return;
+	}
+	const current = loadItemSelectorSettings() || {};
+	saveItemSelectorSettings({ ...current, display_mode: mode });
+});
 
 // Settings Refs
 const hide_qty_decimals = ref(false);
@@ -513,6 +525,7 @@ const lastSyncTimeLabel = computed(() => {
 
 // Settings context object for useItemsSelectorSettings
 const settingsContext = reactive({
+	items_view,
 	new_line,
 	hide_qty_decimals,
 	hide_zero_rate_items,

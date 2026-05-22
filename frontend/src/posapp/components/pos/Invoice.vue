@@ -35,8 +35,40 @@
 				>
 					{{ __("Invoices saved as POS Invoices") }}
 				</v-alert>
-				<div class="invoice-sections">
-					<div class="invoice-top-grid">
+				<div class="invoice-sections" :class="{ 'invoice-sections--compact-customer': isRestaurantTableOrder }">
+					<template v-if="isRestaurantTableOrder">
+						<InvoiceCustomerCompactBar
+							ref="customerSection"
+							:pos_profile="pos_profile"
+							:invoiceTypes="invoiceTypes"
+							:invoice-type="invoiceType"
+							@update:invoice-type="invoiceType = $event"
+						/>
+						<v-card
+							v-if="pos_profile.posa_use_delivery_charges"
+							flat
+							class="invoice-section-card invoice-section-card--compact pos-themed-card"
+						>
+							<DeliveryCharges
+								ref="deliveryChargesComponent"
+								:pos_profile="pos_profile"
+								:delivery_charges="delivery_charges"
+								:selected_delivery_charge="selected_delivery_charge"
+								:delivery_charges_rate="delivery_charges_rate"
+								:deliveryChargesFilter="deliveryChargesFilter"
+								:formatCurrency="formatCurrency"
+								:currencySymbol="currencySymbol"
+								:readonly="readonly"
+								@update:selected_delivery_charge="
+									(val) => {
+										selected_delivery_charge = val;
+										update_delivery_charges(conversion_rate, currency_precision);
+									}
+								"
+							/>
+						</v-card>
+					</template>
+					<div v-else class="invoice-top-grid">
 						<v-card flat class="invoice-section-card pos-themed-card">
 							<div class="invoice-section-heading">
 								<h3 class="invoice-section-heading__title">{{ __("Customer Details") }}</h3>
@@ -47,15 +79,13 @@
 								:invoiceTypes="invoiceTypes"
 								v-model="invoiceType"
 							/>
-						</v-card >
+						</v-card>
 
-						<v-card flat class="invoice-sections pos-themed-card">
+						<v-card flat class="invoice-section-card pos-themed-card">
 							<div class="invoice-section-heading">
 								<h3 class="invoice-section-heading__title">{{ __("Customer Count") }}</h3>
 							</div>
-							<CustomerCount
-								ref="customerCount"
-							/>
+							<CustomerCount ref="customerCount" />
 						</v-card>
 
 						<v-card
@@ -178,7 +208,6 @@
 							<ItemsTable
 								ref="itemsTableRef"
 								:headers="items_headers"
-								v-model:expanded="expanded"
 								:itemsPerPage="itemsPerPage"
 								:itemSearch="itemSearch"
 								:pos_profile="pos_profile"
@@ -202,7 +231,7 @@
 								:toggleOffer="toggleOffer"
 								:changePriceListRate="change_price_list_rate"
 								:isNegative="isNegative"
-								@update:expanded="handleExpandedUpdate"
+								@open-item-details="handleOpenItemDetails"
 								@reorder-items="handleItemReorder"
 								@add-item-from-drag="handleItemDrop"
 								@show-drop-feedback="
@@ -282,6 +311,7 @@
 <script>
 import format from "../../format";
 import InvoiceCustomerSection from "./invoice/InvoiceCustomerSection.vue";
+import InvoiceCustomerCompactBar from "./invoice/InvoiceCustomerCompactBar.vue";
 import DeliveryCharges from "./invoice/DeliveryCharges.vue";
 import CustomerCount from "./invoice/CustomerCount.vue";
 import PostingDateRow from "./invoice/PostingDateRow.vue";
@@ -345,6 +375,7 @@ export default {
 			invoiceType,
 			flowToLoad,
 			flowContext,
+			isRestaurantTableOrder,
 		} = storeToRefs(invoiceStore);
 		const itemsTableRef = ref(null);
 		const currencyState = useInvoiceCurrency({}, {});
@@ -384,6 +415,7 @@ export default {
 			invoiceType,
 			flowToLoad,
 			flowContext,
+			isRestaurantTableOrder,
 			itemsTableRef,
 			...currencyState,
 			...itemActions,
@@ -437,6 +469,7 @@ export default {
 
 	components: {
     InvoiceCustomerSection,
+    InvoiceCustomerCompactBar,
     DeliveryCharges,
     CustomerCount,
     PostingDateRow,
@@ -602,6 +635,12 @@ export default {
 
 		handleExpandedUpdate(ids) {
 			this.expanded = Array.isArray(ids) ? ids.slice(-1) : [];
+		},
+
+		handleOpenItemDetails(item) {
+			if (item) {
+				this.update_item_detail(item);
+			}
 		},
 
 		applyReturnDiscountProration(options = {}) {
@@ -1305,6 +1344,14 @@ export default {
 	align-items: stretch;
 }
 
+.invoice-sections--compact-customer {
+	gap: var(--dynamic-xs);
+}
+
+.invoice-section-card--compact {
+	padding: 4px 8px 8px;
+}
+
 .invoice-top-grid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1345,9 +1392,9 @@ export default {
 	padding-bottom: var(--dynamic-xs);
 	display: flex;
 	flex-direction: column;
-	flex: 0 0 auto;
-	min-height: 320px;
-	overflow: visible;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
 }
 
 /* Responsive breakpoints */
@@ -1481,8 +1528,8 @@ export default {
 	box-sizing: border-box;
 	display: flex;
 	flex-direction: column;
-	flex: 0 0 auto;
-	min-height: 320px;
+	flex: 1 1 auto;
+	min-height: 0;
 	min-width: 0;
 }
 
@@ -1494,18 +1541,19 @@ export default {
 }
 
 :deep(.items-table-wrapper .posa-items-table-container) {
-	flex: 0 0 auto;
-	min-height: 320px;
-	height: auto !important;
-	max-height: none !important;
-	overflow: visible !important;
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100% !important;
+	max-height: 100% !important;
+	overflow: hidden !important;
 }
 
 :deep(.items-table-wrapper .posa-cart-table),
 :deep(.items-table-wrapper .v-data-table__wrapper),
 :deep(.items-table-wrapper .v-table__wrapper) {
-	height: auto !important;
-	max-height: none !important;
+	height: 100% !important;
+	max-height: 100% !important;
+	min-height: 0;
 }
 
 /* New styles for improved column switches */

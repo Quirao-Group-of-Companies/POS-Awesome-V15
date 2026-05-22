@@ -1,7 +1,7 @@
 <template>
 	<div
 		ref="tableContainer"
-		class="my-0 py-0 overflow-y-auto posa-items-table-container posa-responsive-table-container pos-themed-card"
+		class="my-0 py-0 overflow-hidden posa-items-table-container posa-responsive-table-container pos-themed-card"
 		:style="containerStyles"
 		:class="containerClasses"
 		@dragover="onDragOverFromSelector($event)"
@@ -12,21 +12,16 @@
 		<v-data-table-virtual
 			:headers="responsiveHeaders"
 			:items="items"
-			:expanded="expanded"
-			show-expand
 			item-value="posa_row_id"
 			class="posa-cart-table elevation-2 pos-themed-card"
 			:class="tableClasses"
 			:items-per-page="virtualScrollConfig.itemsPerPage"
 			:item-height="virtualScrollConfig.itemHeight"
 			:buffer-size="virtualScrollConfig.bufferSize"
-			expand-on-click
 			fixed-header
 			:density="tableDensity"
 			hide-default-footer
-			:single-expand="true"
 			:header-props="dynamicHeaderProps"
-			@update:expanded="handleExpandedUpdate"
 			:search="itemSearch"
 			:custom-filter="customItemFilter"
 		>
@@ -40,7 +35,7 @@
 				</div>
 			</template>
 
-			<template v-slot:item="{ item, toggleExpand, internalItem }">
+			<template v-slot:item="{ item }">
 				<CartItemRow
 					:item="item"
 					:visible-columns="finalVisibleColumns"
@@ -55,7 +50,6 @@
 					:isNegative="memoizedIsNegative"
 					:hideQtyDecimals="hide_qty_decimals"
 					:isRTL="isRtl"
-					:is-expanded="isItemExpanded(item.posa_row_id)"
 					@update-qty="handleQtyUpdate"
 					@minus-click="handleMinusClick"
 					@add-one="addOne"
@@ -66,40 +60,35 @@
 					@open-name-dialog="openNameDialog"
 					@reset-item-name="resetItemName"
 					@toggle-offer="toggleOffer"
-					@toggle-expand="handleToggleExpand(internalItem, toggleExpand)"
+					@open-item-details="openItemDetails"
 					@remove-item="removeItem"
-					@click="handleRowClick($event, item, toggleExpand, internalItem)"
-				/>
-			</template>
-
-			<!-- Expanded row -->
-			<template v-slot:expanded-row="{ item }">
-				<ItemsTableExpandedRow
-					:item="item"
-					:is-expanded="isItemExpanded(item.posa_row_id)"
-					:colspan="finalVisibleColumns.length"
-					:pos_profile="pos_profile"
-					:invoice-type="invoiceType"
-					:is-return-invoice="isReturnInvoice"
-					:invoice_doc="invoice_doc"
-					:hide_qty_decimals="hide_qty_decimals"
-					:expanded-content-classes="expandedContentClasses"
-					:format-float="memoizedFormatFloat"
-					:format-currency="memoizedFormatCurrency"
-					:currency-symbol="currencySymbol"
-					:is-number="isNumber"
-					:set-formated-currency="setFormatedCurrency"
-					:calc-prices="calcPrices"
-					:calc-uom="calcUom"
-					:change-price-list-rate="changePriceListRate"
-					:get-serial-options="getSerialOptions"
-					:set-serial-no="setSerialNo"
-					:set-batch-qty="setBatchQty"
-					:validate-due-date="validateDueDate"
-					@qty-change="handleQtyChange"
 				/>
 			</template>
 		</v-data-table-virtual>
+
+		<ItemsTableItemDetailsDrawer
+			v-model="itemDetailsOpen"
+			:item="selectedDetailItem"
+			:pos_profile="pos_profile"
+			:invoice_type="invoiceType"
+			:is_return_invoice="isReturnInvoice"
+			:invoice_doc="invoice_doc"
+			:hide_qty_decimals="hide_qty_decimals"
+			:expanded-content-classes="expandedContentClasses"
+			:format_float="memoizedFormatFloat"
+			:format_currency="memoizedFormatCurrency"
+			:currency_symbol="currencySymbol"
+			:is_number="isNumber"
+			:set-formated-currency="setFormatedCurrency"
+			:calc-prices="calcPrices"
+			:calc-uom="calcUom"
+			:change-price-list-rate="changePriceListRate"
+			:get-serial-options="getSerialOptions"
+			:set-serial-no="setSerialNo"
+			:set-batch-qty="setBatchQty"
+			:validate-due-date="validateDueDate"
+			@qty-change="handleQtyChange"
+		/>
 
 		<!-- Edit name dialog -->
 		<v-dialog v-model="editNameDialog" max-width="400">
@@ -130,14 +119,11 @@ import { useInvoiceStore } from "../../../stores/invoiceStore";
 import { loadItemSelectorSettings } from "../../../utils/itemSelectorSettings";
 import { logComponentRender } from "../../../utils/perf";
 import CartItemRow from "./CartItemRow.vue";
-import ItemsTableExpandedRow from "./ItemsTableExpandedRow.vue";
+import ItemsTableItemDetailsDrawer from "./ItemsTableItemDetailsDrawer.vue";
 
 import { useItemsTableSearch } from "../../../composables/pos/items/useItemsTableSearch";
 import { useItemsTableDragDrop } from "../../../composables/pos/items/useItemsTableDragDrop";
-import {
-	DATA_TABLE_EXPAND_COLUMN,
-	useItemsTableResponsive,
-} from "../../../composables/pos/items/useItemsTableResponsive";
+import { useItemsTableResponsive } from "../../../composables/pos/items/useItemsTableResponsive";
 import { useItemsTableMerge } from "../../../composables/pos/items/useItemsTableMerge";
 import { useItemsTableNameEdit } from "../../../composables/pos/items/useItemsTableNameEdit";
 import { useFormatters } from "../../../composables/core/useFormatters";
@@ -185,6 +171,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
 	"update:expanded": [val: any[]];
+	"open-item-details": [item: any];
 	"show-drop-feedback": [val: boolean];
 	"item-dropped": [val: boolean];
 }>();
@@ -246,7 +233,10 @@ const dynamicHeaderProps = computed(() => ({
 	class: `responsive-header container-${breakpoint.value}`,
 }));
 
-const finalVisibleColumns = computed(() => [...responsiveHeaders.value, DATA_TABLE_EXPAND_COLUMN]);
+const finalVisibleColumns = computed(() => responsiveHeaders.value);
+
+const itemDetailsOpen = ref(false);
+const selectedDetailItem = ref<any>(null);
 
 const virtualScrollConfig = computed(() => {
 	const itemCount = items.value?.length || 0;
@@ -276,9 +266,10 @@ const getSerialOptions = (item: any) => {
 	return Array.isArray(item?.serial_no_data) ? item.serial_no_data : [];
 };
 
-const handleExpandedUpdate = (val: any[]) => {
-	const mappedValues = val.map((v) => (typeof v === "object" ? v.posa_row_id : v));
-	emit("update:expanded", mappedValues);
+const openItemDetails = (item: any) => {
+	selectedDetailItem.value = item;
+	itemDetailsOpen.value = true;
+	emit("open-item-details", item);
 };
 
 const handleQtyChange = (item: any, event: any) => {
@@ -334,24 +325,8 @@ const handleDiscountAmountUpdate = (item: any, newDiscount: any) => {
 	props.calcPrices(item, newDiscount, { target: { id: "discount_amount" } });
 };
 
-const handleRowClick = (event: any, item: any, toggleExpand: any, internalItem: any) => {
-	if (toggleExpand) {
-		toggleExpand(internalItem);
-	}
-};
-
-const handleToggleExpand = (internalItem: any, toggleExpand: any) => {
-	if (toggleExpand) {
-		toggleExpand(internalItem);
-	}
-};
-
 const focusItemField = (index: number, field: CartShortcutField) => {
 	return focusCartItemField(tableContainer.value, index, field);
-};
-
-const isItemExpanded = (itemId: any) => {
-	return props.expanded?.includes(itemId);
 };
 
 // Drag and Drop delegation
@@ -389,5 +364,21 @@ defineExpose({
 .posa-items-table-container {
 	position: relative;
 	transition: all 0.3s ease;
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	height: 100%;
+}
+
+.posa-items-table-container :deep(.v-table) {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.posa-items-table-container :deep(.v-table__wrapper) {
+	flex: 1 1 auto;
+	min-height: 0;
+	max-height: 100%;
 }
 </style>

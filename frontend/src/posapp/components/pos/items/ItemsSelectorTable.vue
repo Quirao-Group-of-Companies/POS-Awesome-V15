@@ -16,6 +16,25 @@
 			:row-props="rowProps"
 			@scroll.passive="handleListScroll"
 		>
+			<template v-slot:item.item_name="{ item }">
+				<div class="item-list-name-cell">
+					<v-icon
+						size="16"
+						:color="categoryAccentFor(item).color"
+						:icon="categoryAccentFor(item).icon"
+						class="item-list-name-cell__icon"
+					/>
+					<span class="text-high-emphasis font-weight-bold item-list-name-cell__name">
+						{{ item.item_name }}
+					</span>
+				</div>
+			</template>
+			<template v-slot:item.item_code="{ item }">
+				<span class="text-medium-emphasis">{{ item.item_code }}</span>
+			</template>
+			<template v-slot:item.stock_uom="{ item }">
+				<span class="text-medium-emphasis font-weight-medium">{{ item.stock_uom }}</span>
+			</template>
 			<template v-slot:item.rate="{ item }">
 				<div v-if="context !== 'purchase'">
 					<div class="text-primary rate-cell-primary">
@@ -96,7 +115,10 @@
 				</div>
 			</template>
 			<template v-slot:item.actual_qty="{ item }">
-				<span class="golden--text" :class="{ 'negative-number': isNegative(item.actual_qty) }">
+				<span
+					class="text-high-emphasis font-weight-bold"
+					:class="{ 'negative-number': isNegative(item.actual_qty) }"
+				>
 					{{ formatActualQty(item.actual_qty) }}
 				</span>
 			</template>
@@ -107,6 +129,7 @@
 <script setup>
 import { ref } from "vue";
 import ItemRateInfoMenu from "./ItemRateInfoMenu.vue";
+import { getItemCategoryAccent } from "../../../utils/itemCategoryAccent";
 
 const props = defineProps({
 	displayedItems: { type: Array, default: () => [] },
@@ -129,6 +152,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["row-click", "list-scroll"]);
+
+const categoryAccentFor = (item) => getItemCategoryAccent(item);
 
 const handleRowClick = (event, data) => {
 	emit("row-click", event, data);
@@ -287,10 +312,26 @@ defineExpose({ scrollToIndex, getTableElement, tableRef });
 	background-color: rgba(var(--v-theme-on-surface), 0.015);
 }
 
+.item-list-name-cell {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.item-list-name-cell__name {
+	line-height: 1.35;
+}
+
+.item-list-name-cell__icon {
+	flex-shrink: 0;
+	opacity: 0.95;
+}
+
 .sleek-data-table :deep(td) {
 	padding: 14px 16px;
 	vertical-align: middle;
-	color: var(--pos-text-primary);
+	color: rgba(255, 255, 255, 0.92);
 	font-family:
 		"SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans Arabic", "Tahoma",
 		sans-serif;

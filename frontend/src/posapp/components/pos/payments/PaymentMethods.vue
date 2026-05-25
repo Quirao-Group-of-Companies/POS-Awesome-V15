@@ -108,7 +108,7 @@
 					<div class="card-details-section">
 						<p class="card-details-section__label">{{ __("Card Details") }} <span class="card-details-section__required">*</span></p>
 						<v-row dense class="ma-0">
-							<v-col cols="12" md="4">
+							<v-col cols="12" md="3">
 								<v-select
 									density="compact"
 									variant="solo"
@@ -122,12 +122,12 @@
 									@update:model-value="$emit('update-card-detail', payment, 'posa_card_type', $event)"
 								/>
 							</v-col>
-							<v-col cols="12" md="4">
+							<v-col cols="12" md="3">
 								<v-text-field
 									density="compact"
 									variant="solo"
 									color="primary"
-									:label="__('Last 4 Digits')"
+									:label="__('Account No.')"
 									class="sleek-field pos-themed-input"
 									hide-details="auto"
 									:model-value="payment.posa_card_last4"
@@ -138,7 +138,7 @@
 									@change="$emit('update-card-detail', payment, 'posa_card_last4', $event.target?.value ?? $event)"
 								/>
 							</v-col>
-							<v-col cols="12" md="4">
+							<v-col cols="12" md="3">
 								<v-text-field
 									density="compact"
 									variant="solo"
@@ -149,6 +149,32 @@
 									:model-value="payment.posa_card_ref"
 									:rules="[v => !!v || __('Transaction reference required')]"
 									@change="$emit('update-card-detail', payment, 'posa_card_ref', $event.target?.value ?? $event)"
+								/>
+							</v-col>
+							<v-col cols="12" md="3">
+								<v-text-field
+									density="compact"
+									variant="solo"
+									color="primary"
+									:label="__('Batch No.')"
+									class="sleek-field pos-themed-input"
+									hide-details="auto"
+									:model-value="payment.posa_batch_no"
+									:rules="[v => !!v || __('Batch No. required')]"
+									@change="$emit('update-card-detail', payment, 'posa_batch_no', $event.target?.value ?? $event)"
+								/>
+							</v-col>
+							<v-col cols="12" md="3">
+								<v-text-field
+									density="compact"
+									variant="solo"
+									color="primary"
+									:label="__('Aproval No.')"
+									class="sleek-field pos-themed-input"
+									hide-details="auto"
+									:model-value="payment.posa_approval_no"
+									:rules="[v => !!v || __('Approval No. required')]"
+									@change="$emit('update-card-detail', payment, 'posa_approval_no', $event.target?.value ?? $event)"
 								/>
 							</v-col>
 						</v-row>

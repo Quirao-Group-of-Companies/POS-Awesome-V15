@@ -1517,16 +1517,24 @@ const submitInvoiceWrapper = async (print, callbackOverrides = {}, options = {})
     );
 	
     for (const p of cardPayments) {
-		// const mop = p.mode_of_payment.toLowerCase()
+		const mop = p.mode_of_payment.toLowerCase()
 
         if (!p.posa_card_type) {
             toastStore.show({ title: __("Card Type is required for {0}", [p.mode_of_payment]), color: "error" });
             return;
         }
-        // if ((mop.includes("credit card") || mop.includes("debit card") ) && !/^\d{4}$/.test(p.posa_card_last4 || "")) {
-        //     toastStore.show({ title: __("Last 4 card digits are required for {0}", [p.mode_of_payment]), color: "error" });
-        //     return;
-        // }
+
+		if (!p.posa_batch_no){
+			toastStore.show({ title: __("Batch No. is required for {0}", [p.mode_of_pamynet]), color: "error" })
+		}
+
+		if (!p.posa_approval_no){
+			toastStore.show({ title: __("Approval No. is required for {0}", [p.mode_of_pamynet]), color: "error" })
+		}
+        if ((mop.includes("credit card") || mop.includes("debit card") ) && !/^\d{4}$/.test(p.posa_card_last4 || "")) {
+            toastStore.show({ title: __("Last 4 card digits are required for {0}", [p.mode_of_payment]), color: "error" });
+            return;
+        }
         if (!p.posa_card_ref?.trim()) {
             toastStore.show({ title: __("Transaction reference is required for {0}", [p.mode_of_payment]), color: "error" });
             return;
@@ -1539,11 +1547,15 @@ const submitInvoiceWrapper = async (print, callbackOverrides = {}, options = {})
             invoice_doc.value.custom_card_type = firstCard.posa_card_type  || "";
             invoice_doc.value.custom_card_number_last_4_digits = firstCard.posa_card_last4 || "";
             invoice_doc.value.custom_reference_number = firstCard.posa_card_ref   || "";
+            invoice_doc.value.custom_batch_no = firstCard.posa_batch_no   || "";
+            invoice_doc.value.custom_approval_no = firstCard.posa_approval_no   || "";
         } else {
             // Clear the fields if no card payment is present (e.g. user switched to cash)
             invoice_doc.value.custom_card_type = "";
             invoice_doc.value.custom_card_number_last_4_digits = "";
             invoice_doc.value.custom_reference_number = "";
+			invoice_doc.value.custom_batch_no =  "";
+            invoice_doc.value.custom_approval_no = "";
         }
     }
 

@@ -1,3 +1,5 @@
+import { RESTAURANT_THEME } from "../styles/restaurantTheme";
+
 export type ItemCategoryAccent = {
 	color: string;
 	icon: string;
@@ -5,68 +7,53 @@ export type ItemCategoryAccent = {
 	label: string;
 };
 
+/** Unified red strip — matches Restaurant Red theme on hover/highlight. */
+const THEME_ACCENT_BORDER = RESTAURANT_THEME.primary;
+const THEME_ACCENT_COLOR = "primary";
+
 type AccentRule = {
 	match: RegExp;
-	accent: ItemCategoryAccent;
+	accent: Omit<ItemCategoryAccent, "borderColor" | "color">;
 };
 
 const ACCENT_RULES: AccentRule[] = [
 	{
 		match: /drink|beverage|juice|soda|coffee|tea|beer|wine|bar|cocktail|smoothie/i,
-		accent: {
-			color: "info",
-			icon: "mdi-cup-water",
-			borderColor: "#2196F3",
-			label: "Drinks",
-		},
+		accent: { icon: "mdi-cup-water", label: "Drinks" },
 	},
 	{
 		match: /hot|meal|food|kitchen|entree|main|plate|rice|noodle|soup|grill/i,
-		accent: {
-			color: "warning",
-			icon: "mdi-food",
-			borderColor: "#FB8C00",
-			label: "Hot food",
-		},
+		accent: { icon: "mdi-food", label: "Hot food" },
 	},
 	{
 		match: /dessert|sweet|cake|pastry|ice\s*cream/i,
-		accent: {
-			color: "secondary",
-			icon: "mdi-cupcake",
-			borderColor: "#FF5252",
-			label: "Dessert",
-		},
+		accent: { icon: "mdi-cupcake", label: "Dessert" },
 	},
 	{
 		match: /appetizer|starter|side|snack|salad/i,
-		accent: {
-			color: "success",
-			icon: "mdi-food-apple",
-			borderColor: "#66BB6A",
-			label: "Sides",
-		},
+		accent: { icon: "mdi-food-apple", label: "Sides" },
 	},
 	{
 		match: /grocery|retail|pack|bottle|can/i,
-		accent: {
-			color: "surface-variant",
-			icon: "mdi-package-variant",
-			borderColor: "rgba(255, 255, 255, 0.35)",
-			label: "Retail",
-		},
+		accent: { icon: "mdi-package-variant", label: "Retail" },
 	},
 ];
 
 const DEFAULT_ACCENT: ItemCategoryAccent = {
-	color: "surface-variant",
+	color: THEME_ACCENT_COLOR,
 	icon: "mdi-tag-outline",
-	borderColor: "rgba(255, 255, 255, 0.22)",
+	borderColor: THEME_ACCENT_BORDER,
 	label: "Item",
 };
 
+const withThemeColors = (partial: Omit<ItemCategoryAccent, "borderColor" | "color">): ItemCategoryAccent => ({
+	...partial,
+	color: THEME_ACCENT_COLOR,
+	borderColor: THEME_ACCENT_BORDER,
+});
+
 /**
- * Resolve a subtle category accent for item cards (color strip + icon).
+ * Resolve a subtle category accent for item cards (red side strip + icon on hover).
  */
 export function getItemCategoryAccent(item?: {
 	item_group?: string | null;
@@ -78,13 +65,9 @@ export function getItemCategoryAccent(item?: {
 
 	for (const rule of ACCENT_RULES) {
 		if (rule.match.test(group)) {
-			return rule.accent;
+			return withThemeColors(rule.accent);
 		}
 	}
 
-	return {
-		...DEFAULT_ACCENT,
-		label: group,
-		borderColor: "rgba(211, 47, 47, 0.55)",
-	};
+	return withThemeColors({ icon: "mdi-tag-outline", label: group });
 }

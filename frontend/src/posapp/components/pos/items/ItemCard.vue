@@ -1,7 +1,7 @@
 <template>
 	<div
 		:class="['card-item-card', { 'item-highlighted': isItemHighlighted }]"
-		:style="categoryAccentStyle"
+		:style="{ '--card-accent-color': categoryAccent.borderColor }"
 		@click="onClick"
 		:draggable="true"
 		@dragstart="onDragStart"
@@ -100,12 +100,6 @@ const emit = defineEmits(["click", "dragstart", "dragend"]);
 
 const categoryAccent = computed(() => getItemCategoryAccent(props.item));
 
-const categoryAccentStyle = computed(() => ({
-	borderLeftWidth: "4px",
-	borderLeftStyle: "solid",
-	borderLeftColor: categoryAccent.value.borderColor,
-}));
-
 const primaryCurrency = computed(() => {
 	if (props.context === "purchase") {
 		return (
@@ -192,6 +186,21 @@ const onDragEnd = (event) => {
 	backface-visibility: hidden;
 	transform: translate3d(0, 0, 0);
 	position: relative;
+	--card-accent-color: transparent;
+}
+
+.card-item-card::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 4px;
+	background: var(--card-accent-color);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 1;
+	pointer-events: none;
 }
 
 .card-item-category-strip {
@@ -207,12 +216,24 @@ const onDragEnd = (event) => {
 	border-radius: 999px;
 	background: rgba(0, 0, 0, 0.45);
 	backdrop-filter: blur(4px);
+	opacity: 0;
+	transition: opacity 0.2s ease;
 }
 
 .card-item-card:hover {
 	transform: translate3d(0, -3px, 0);
 	box-shadow: 0 16px 32px var(--pos-shadow);
 	border-color: rgba(var(--v-theme-primary), 0.35);
+}
+
+.card-item-card:hover::before,
+.card-item-card.item-highlighted::before {
+	opacity: 1;
+}
+
+.card-item-card:hover .card-item-category-strip,
+.card-item-card.item-highlighted .card-item-category-strip {
+	opacity: 1;
 }
 
 .card-item-card.item-highlighted {

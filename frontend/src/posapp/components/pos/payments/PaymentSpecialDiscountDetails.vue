@@ -1,7 +1,7 @@
 <template>
     <div v-if="invoiceDoc">
         <div class="payment-section__subsection">
-            <h3 class="payment-section__title payment-section__title--subsection">
+            <h3 class="payment-section__title payment-section__title--subsection mb-2">
                 {{ __("Special Discount Details") }}
             </h3>
         </div>

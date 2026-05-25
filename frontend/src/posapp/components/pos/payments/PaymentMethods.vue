@@ -103,6 +103,57 @@
 						{{ __("Request Payment") }}
 					</v-btn>
 				</v-col>
+				<!-- Card Payment Details -->
+				<v-col cols="12" v-if="isCardPayment(payment) && payment.amount && payment.amount !== 0">
+					<div class="card-details-section">
+						<p class="card-details-section__label">{{ __("Card Details") }} <span class="card-details-section__required">*</span></p>
+						<v-row dense class="ma-0">
+							<v-col cols="12" md="4">
+								<v-select
+									density="compact"
+									variant="solo"
+									color="primary"
+									:label="__('Card Type')"
+									class="sleek-field pos-themed-input"
+									hide-details="auto"
+									:model-value="payment.posa_card_type"
+									:items="cardTypes"
+									:rules="[v => !!v || __('Card Type is required')]"
+									@update:model-value="$emit('update-card-detail', payment, 'posa_card_type', $event)"
+								/>
+							</v-col>
+							<v-col cols="12" md="4">
+								<v-text-field
+									density="compact"
+									variant="solo"
+									color="primary"
+									:label="__('Last 4 Digits')"
+									class="sleek-field pos-themed-input"
+									hide-details="auto"
+									:model-value="payment.posa_card_last4"
+									maxlength="4"
+									:rules="[
+										v => !v || /^\d{4}$/.test(v) || __('Must be exactly 4 digits')
+									]"
+									@change="$emit('update-card-detail', payment, 'posa_card_last4', $event.target?.value ?? $event)"
+								/>
+							</v-col>
+							<v-col cols="12" md="4">
+								<v-text-field
+									density="compact"
+									variant="solo"
+									color="primary"
+									:label="__('Transaction Reference')"
+									class="sleek-field pos-themed-input"
+									hide-details="auto"
+									:model-value="payment.posa_card_ref"
+									:rules="[v => !!v || __('Transaction reference required')]"
+									@change="$emit('update-card-detail', payment, 'posa_card_ref', $event.target?.value ?? $event)"
+								/>
+							</v-col>
+						</v-row>
+					</div>
+				</v-col>
 			</v-row>
 		</div>
 	</div>
@@ -137,7 +188,15 @@ const emit = defineEmits([
 	"request-payment",
 	"set-rest-amount",
 	"open-gift-card",
+	"update-card-detail",
 ]);
+
+const cardTypes = ["Visa", "Matercard", "JCB", "UnionPay", "American Express", "Others"]
+
+const isCardPayment = (payment) => {
+    const mop = String(payment?.mode_of_payment || "").toLowerCase();
+    return mop.includes("credit card") || mop.includes("debit card") || mop.includes("gcash") || mop.includes("gotyme") || mop.includes("maribank");
+};
 
 const handlePrimaryAction = (payment) => {
 	if (props.isGiftCardPayment(payment)) {
@@ -149,6 +208,29 @@ const handlePrimaryAction = (payment) => {
 </script>
 
 <style scoped>
+.card-details-section {
+    background: rgba(var(--v-theme-primary), 0.04);
+    border: 1px dashed rgba(var(--v-theme-primary), 0.3);
+    border-radius: var(--pos-radius-sm);
+    padding: var(--pos-space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--pos-space-2);
+}
+
+.card-details-section__label {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pos-text-secondary);
+}
+
+.card-details-section__required {
+    color: rgb(var(--v-theme-error));
+}
+
 .payment-methods {
 	display: flex;
 	flex-direction: column;

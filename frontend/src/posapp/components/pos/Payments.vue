@@ -67,6 +67,7 @@
 							@request-payment="request_payment"
 							@set-rest-amount="set_rest_amount"
 							@open-gift-card="openGiftCardDialog"
+							@update-card-detail="handleCardDetailUpdate"
 						/>
 						<PaymentGiftCardSection
 							:enabled="Boolean(pos_profile?.posa_use_gift_cards)"
@@ -405,6 +406,15 @@ const giftCardLoading = ref(false);
 const giftCardMode = ref("redeem");
 const giftCardError = ref("");
 const giftCardRedemptions = ref([]);
+
+const isCardModeName = (mop) => {
+    const name = String(mop || "").toLowerCase();
+    return name.includes("credit card") || name.includes("debit card");
+};
+
+const handleCardDetailUpdate = (payment, field, value) => {
+    payment[field] = value;
+};
 
 // Computed Properties
 const invoice_doc = computed({
@@ -1501,6 +1511,42 @@ const submitInvoiceWrapper = async (print, callbackOverrides = {}, options = {})
 		return;
 	}
 
+	// ── Card detail validation ──────────────────────────────────────────
+	const cardPayments = (invoice_doc.value?.payments || []).filter(
+        (p) => isCardModeName(p.mode_of_payment) && Math.abs(flt(p.amount || 0, currency_precision.value)) > 0,
+    );
+	
+    for (const p of cardPayments) {
+		// const mop = p.mode_of_payment.toLowerCase()
+
+        if (!p.posa_card_type) {
+            toastStore.show({ title: __("Card Type is required for {0}", [p.mode_of_payment]), color: "error" });
+            return;
+        }
+        // if ((mop.includes("credit card") || mop.includes("debit card") ) && !/^\d{4}$/.test(p.posa_card_last4 || "")) {
+        //     toastStore.show({ title: __("Last 4 card digits are required for {0}", [p.mode_of_payment]), color: "error" });
+        //     return;
+        // }
+        if (!p.posa_card_ref?.trim()) {
+            toastStore.show({ title: __("Transaction reference is required for {0}", [p.mode_of_payment]), color: "error" });
+            return;
+        }
+    }
+
+	if (invoice_doc.value) {
+        const firstCard = cardPayments[0];
+        if (firstCard) {
+            invoice_doc.value.custom_card_type = firstCard.posa_card_type  || "";
+            invoice_doc.value.custom_card_number_last_4_digits = firstCard.posa_card_last4 || "";
+            invoice_doc.value.custom_reference_number = firstCard.posa_card_ref   || "";
+        } else {
+            // Clear the fields if no card payment is present (e.g. user switched to cash)
+            invoice_doc.value.custom_card_type = "";
+            invoice_doc.value.custom_card_number_last_4_digits = "";
+            invoice_doc.value.custom_reference_number = "";
+        }
+    }
+
 	submissionInFlight.value = true;
 	loading.value = true;
 	try {
@@ -1916,6 +1962,13 @@ onMounted(() => {
 			is_credit_return.value = false;
 			return_valid_upto_date.value = null;
 			resetGiftCardState({ clearPayment: true });
+
+			    // Clear card fields on the new blank doc if one exists
+			if (invoice_doc.value) {
+				invoice_doc.value.custom_card_type                = "";
+				invoice_doc.value.custom_card_number_last_4_digits = "";
+				invoice_doc.value.custom_reference_number          = "";
+			}
 		});
 	}
 

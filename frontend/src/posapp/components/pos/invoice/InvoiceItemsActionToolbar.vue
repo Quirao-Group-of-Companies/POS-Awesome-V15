@@ -8,7 +8,7 @@
 			variant="solo"
 			color="primary"
 			class="item-search-field pos-themed-input"
-			:label="__('Search items or barcode')"
+			:label="__('Search items')"
 			prepend-inner-icon="mdi-magnify"
 			hide-details
 			clearable

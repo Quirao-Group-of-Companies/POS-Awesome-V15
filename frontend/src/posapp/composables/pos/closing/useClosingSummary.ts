@@ -14,6 +14,9 @@ export function useClosingSummary(
 	dialogData: any,
 	formatters: SummaryFormatters,
 ) {
+	console.log("overview",overview);
+	
+
 	const {
 		formatCurrencyWithSymbol,
 		formatCount,

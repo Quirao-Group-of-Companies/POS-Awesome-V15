@@ -4,6 +4,7 @@ import {
 	getCachedCustomerBalance,
 } from "../../../../offline/index";
 import { useDiscounts } from "../../../composables/pos/shared/useDiscounts";
+import { applyRestaurantDefaultCustomer } from "../../../utils/restaurantCustomer";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const flt: (_value: unknown, _precision?: number) => number;
@@ -132,6 +133,7 @@ export async function load_invoice(
 				additional_discount: context.additional_discount,
 				additional_discount_percentage:
 					context.additional_discount_percentage,
+				service_charge: context.service_charge,
 			}
 		: null;
 
@@ -153,6 +155,12 @@ export async function load_invoice(
 			context.additional_discount_percentage =
 				stickyData.additional_discount_percentage;
 			context.discount_amount = context.additional_discount;
+		}
+		if (
+			data.posa_service_charge === undefined &&
+			stickyData.service_charge !== undefined
+		) {
+			context.service_charge = stickyData.service_charge;
 		}
 	}
 
@@ -182,6 +190,11 @@ export async function load_invoice(
 		data.doctype === "Sales Order" &&
 		context.pos_profile?.posa_create_only_sales_order
 	) {
+		context.invoiceType = "Order";
+		if (!context.invoiceTypes.includes("Order")) {
+			context.invoiceTypes = ["Invoice", "Order", "Quotation"];
+		}
+	} else if (data.restaurant_table != null && data.restaurant_table !== "") {
 		context.invoiceType = "Order";
 		if (!context.invoiceTypes.includes("Order")) {
 			context.invoiceTypes = ["Invoice", "Order", "Quotation"];
@@ -247,6 +260,7 @@ export async function load_invoice(
 	}
 
 	context.customer = data.customer;
+	applyRestaurantDefaultCustomer(context, data);
 	if (context.set_delivery_charges) await context.set_delivery_charges();
 
 	context.posting_date = context.formatDateForBackend
@@ -259,6 +273,11 @@ export async function load_invoice(
 			(charge) => charge.name === data.posa_delivery_charges,
 		);
 		context.delivery_charges_rate = data.posa_delivery_charges_rate;
+	}
+	if (data.posa_service_charge !== undefined && data.posa_service_charge !== null) {
+		context.service_charge = context.flt
+			? context.flt(data.posa_service_charge, context.currency_precision)
+			: flt(data.posa_service_charge);
 	}
 	const roundFloat = (value: unknown, fallbackPrecision = 2) => {
 		const precision = Number.isFinite(Number(context.float_precision))

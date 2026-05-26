@@ -12,6 +12,7 @@ from frappe.utils import (
 from erpnext.setup.utils import get_exchange_rate
 
 
+
 def _get_return_validity_settings(pos_profile: str | None = None):
     """Return whether return validity is enabled and the default days window.
 

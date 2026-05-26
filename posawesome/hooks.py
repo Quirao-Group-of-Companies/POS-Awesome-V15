@@ -75,6 +75,8 @@ after_migrate = [
     "posawesome.patches.add_dashboard_global_settings.execute",
     "posawesome.patches.reorganize_pos_profile_sections.execute",
     "posawesome.patches.add_gift_card_pos_profile_settings.execute",
+    "posawesome.patches.add_paluto_pos_profile_settings.execute",
+    "posawesome.patches.add_pos_skip_business_checks_profile_field.execute",
     "posawesome.patches.add_gift_card_invoice_redemption_fields.execute",
     "posawesome.patches.add_gift_card_to_workspace.execute",
     "posawesome.patches.add_submission_ledger_to_workspace.execute",

@@ -218,7 +218,7 @@
 }
 
 .posa-cart-table tr:hover {
-	background-color: rgba(25, 118, 210, 0.04);
+	background-color: var(--pos-table-row-hover);
 }
 
 .posa-cart-table tbody tr:nth-child(even) {
@@ -242,6 +242,27 @@
 	align-items: center;
 	justify-content: center;
 	box-sizing: border-box;
+}
+
+.posa-cart-table td[data-column-key="item_name"] {
+	text-align: start !important;
+}
+
+.posa-cart-table td[data-column-key="item_name"] .posa-cart-item-name {
+	color: rgba(255, 255, 255, 0.96);
+	font-weight: 700;
+	font-size: 0.98rem;
+	line-height: 1.35;
+}
+
+.posa-cart-table td[data-column-key="uom"] .posa-cart-table__editor-display,
+.posa-cart-table td[data-column-key="uom"] .text-medium-emphasis {
+	color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.posa-cart-table td[data-column-key="qty"] .posa-cart-table__qty-display {
+	color: rgba(255, 255, 255, 0.92);
+	font-weight: 700;
 }
 
 /* =================================================================
@@ -356,11 +377,11 @@
 	width: auto;
 	flex: 1 1 auto;
 	text-align: center;
-	font-weight: 600;
+	font-weight: 700;
 	padding: 0 2px;
 	border-radius: 4px;
-	background: var(--pos-primary-container);
-	border: 1px solid var(--pos-primary-variant);
+	background: rgb(var(--v-theme-surface-variant));
+	border: 1px solid rgba(var(--v-theme-on-surface), 0.28);
 	font-family:
 		"SF Pro Display", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "Noto Sans Arabic", "Tahoma",
 		sans-serif;
@@ -369,8 +390,8 @@
 		"tnum" 1,
 		"lnum" 1,
 		"kern" 1;
-	color: var(--pos-primary);
-	font-size: 0.75rem;
+	color: rgba(255, 255, 255, 0.96);
+	font-size: 0.82rem;
 	transition: all 0.2s ease;
 	box-shadow: 0 1px 3px var(--pos-shadow-light);
 	display: flex;
@@ -423,13 +444,10 @@
 	gap: 4px;
 	padding: 4px 8px;
 	border-radius: 6px;
-	border: 1px solid var(--pos-primary-variant);
-	/* Match Qty border strength */
-	background: var(--pos-primary-container);
-	/* Match Qty background strength */
-	color: var(--pos-primary-text);
-	/* Ensure text is visible */
-	font-weight: 500;
+	border: 1px solid rgba(var(--v-theme-on-surface), 0.28);
+	background: rgb(var(--v-theme-surface-variant));
+	color: rgba(255, 255, 255, 0.92);
+	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.2s ease;
 	height: 32px;
@@ -457,6 +475,11 @@
 	padding: 0;
 }
 
+.posa-cart-table__qty-input :deep(.v-field),
+.posa-cart-table__editor-input :deep(.v-field) {
+	background: rgb(var(--v-theme-surface-variant)) !important;
+}
+
 .posa-cart-table__editor-input .v-field__input,
 .posa-cart-table__qty-input .v-field__input {
 	min-height: 32px !important;
@@ -464,6 +487,7 @@
 	padding-top: 0 !important;
 	padding-bottom: 0 !important;
 	text-align: center;
+	color: rgba(255, 255, 255, 0.96) !important;
 	font-weight: 600;
 	font-size: 0.9rem;
 }
@@ -567,12 +591,6 @@
 .posa-cart-table .v-divider,
 .posa-cart-table .v-spacer {
 	display: none !important;
-}
-
-/* Additional cleanup for v-data-table-virtual specific elements */
-.posa-cart-table .v-data-table-virtual__spacer {
-	display: none !important;
-	height: 0 !important;
 }
 
 /* Hide empty measurement/calculation rows */

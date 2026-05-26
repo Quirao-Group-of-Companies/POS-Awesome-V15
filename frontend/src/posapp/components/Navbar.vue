@@ -3,6 +3,7 @@
 		<!-- Use the modular NavbarAppBar component -->
 		<NavbarAppBar
 			:pos-profile="posProfile"
+			:logo-src="companyImg"
 			:cashier-name="currentCashierDisplay"
 			:pending-invoices="pendingInvoices"
 			:loading-progress="loadingProgress"
@@ -75,6 +76,8 @@
 					:network-online="networkOnline"
 					:server-online="serverOnline"
 					@close-shift="openCloseShift"
+					@x-reading="$emit('x-reading')"
+					@z-reading="$emit('z-reading')"
 					@sync-invoices="syncPendingInvoices"
 					@open-employee-switch="openEmployeeSwitch"
 					@lock-pos="lockPosScreen"
@@ -160,7 +163,7 @@ import CacheUsageMeter from "./navbar/CacheUsageMeter.vue";
 import AboutDialog from "./navbar/AboutDialog.vue";
 import OfflineInvoices from "./OfflineInvoices.vue";
 import EmployeeSwitchDialog from "./pos/employee/EmployeeSwitchDialog.vue";
-import posLogo from "./pos/pos.png";
+import { POS_NAVBAR_LOGO_PATH, resolvePosNavbarLogo } from "../utils/posNavbarLogo";
 import { forceClearAllCache } from "../../offline/index";
 import { clearAllCaches } from "../../utils/clearAllCaches";
 import { isOffline } from "../../offline/index";
@@ -304,7 +307,7 @@ export default {
 			],
 			items: [],
 			company: "POS Awesome",
-			companyImg: posLogo,
+			companyImg: POS_NAVBAR_LOGO_PATH,
 			showAboutDialog: false,
 			showOfflineInvoices: false,
 			settingsPanelOpen: false,
@@ -529,7 +532,8 @@ export default {
 					const logo =
 						frappe.boot.website_settings.app_logo || frappe.boot.website_settings.banner_image;
 					if (logo) {
-						this.$set ? this.$set(this, "companyImg", logo) : (this.companyImg = logo);
+						const resolved = resolvePosNavbarLogo(logo);
+						this.$set ? this.$set(this, "companyImg", resolved) : (this.companyImg = resolved);
 					}
 				}
 			}
@@ -611,9 +615,12 @@ export default {
 				if (frappe.boot && frappe.boot.website_settings) {
 					const newLogo =
 						frappe.boot.website_settings.app_logo || frappe.boot.website_settings.banner_image;
-					if (newLogo && this.companyImg !== newLogo) {
-						this.companyImg = newLogo;
-						updated = true;
+					if (newLogo) {
+						const resolved = resolvePosNavbarLogo(newLogo);
+						if (this.companyImg !== resolved) {
+							this.companyImg = resolved;
+							updated = true;
+						}
 					}
 				}
 
@@ -997,7 +1004,7 @@ export default {
 			} else if (data && data.name) {
 				this.company = data.name;
 				if (data.company_image) {
-					this.companyImg = data.company_image;
+					this.companyImg = resolvePosNavbarLogo(data.company_image);
 				}
 			}
 		},
@@ -1021,6 +1028,8 @@ export default {
 		"nav-click",
 		"change-page",
 		"close-shift",
+		"x-reading",
+		"z-reading",
 		"sync-invoices",
 		"retry-status",
 		"open-customer-display",

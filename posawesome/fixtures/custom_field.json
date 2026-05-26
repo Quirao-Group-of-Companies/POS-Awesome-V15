@@ -8190,5 +8190,25 @@
 		"unique": 1,
 		"insert_after": "reference_no",
 		"name": "Payment Entry-posa_client_request_id"
+	},
+	{
+		"doctype": "Custom Field",
+		"dt": "POS Settings",
+		"fieldname": "custom_service_charge_percent",
+		"fieldtype": "Percent",
+		"label": "Service Charge Percent",
+		"no_copy": 1,
+		"insert_after": "pos_search_fields",
+		"name": "POS Settings-custom_service_charge_percent"
+	},
+	{
+		"doctype": "Custom Field",
+		"dt": "POS Settings",
+		"fieldname": "custom_special_discount_percent",
+		"fieldtype": "Percent",
+		"label": "Special Discount Percent",
+		"no_copy": 1,
+		"insert_after": "custom_service_charge_percent",
+		"name": "POS Settings-custom_special_discount_percent"
 	}
 ]

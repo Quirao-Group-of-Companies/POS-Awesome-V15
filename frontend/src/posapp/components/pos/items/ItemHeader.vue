@@ -273,7 +273,7 @@ defineExpose({
 .search-sync-progress__value {
 	font-size: 0.7rem;
 	line-height: 1.2;
-	color: color-mix(in srgb, var(--pos-primary, #2563eb) 78%, #0f172a 22%);
+	color: color-mix(in srgb, var(--pos-primary, #d32f2f) 78%, #0f172a 22%);
 }
 
 .search-sync-progress__label {

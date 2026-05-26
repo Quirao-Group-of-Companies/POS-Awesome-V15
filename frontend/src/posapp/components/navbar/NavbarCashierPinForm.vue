@@ -300,7 +300,7 @@ async function saveCashierPin() {
 .navbar-cashier-pin-form__back {
 	width: fit-content;
 	border: 1px solid var(--pos-border);
-	background: rgba(25, 118, 210, 0.06);
+	background: rgba(211, 47, 47, 0.06);
 	color: var(--pos-text-primary);
 	border-radius: 999px;
 	padding: 8px 12px;
@@ -314,7 +314,7 @@ async function saveCashierPin() {
 	padding: 14px 16px;
 	border: 1px solid var(--pos-border);
 	border-radius: 18px;
-	background: rgba(25, 118, 210, 0.04);
+	background: rgba(211, 47, 47, 0.04);
 }
 
 .navbar-cashier-pin-form__summary-label {
@@ -345,7 +345,7 @@ async function saveCashierPin() {
 }
 
 .navbar-cashier-pin-form__alert--info {
-	background: rgba(25, 118, 210, 0.08);
+	background: rgba(211, 47, 47, 0.08);
 	color: var(--pos-text-primary);
 }
 
@@ -396,7 +396,7 @@ async function saveCashierPin() {
 }
 
 .navbar-cashier-pin-form__toggle {
-	background: rgba(25, 118, 210, 0.04);
+	background: rgba(211, 47, 47, 0.04);
 	color: var(--pos-text-primary);
 }
 

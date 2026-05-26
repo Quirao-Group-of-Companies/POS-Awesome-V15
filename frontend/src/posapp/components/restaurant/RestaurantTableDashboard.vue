@@ -15,7 +15,7 @@
 					/>
 				</v-col>
 
-				<v-col cols="12" md="4" class="legend-wrap my-3 my-md-0">
+				<v-col cols="12" md="8" class="legend-wrap my-3 my-md-0">
 					<div
 						v-for="item in legend"
 						:key="item.status"
@@ -27,19 +27,6 @@
 						/>
 						<span>{{ item.label }}</span>
 					</div>
-				</v-col>
-
-				<v-col cols="12" md="5" class="action-wrap">
-					<v-btn
-						v-for="action in actions"
-						:key="action.label"
-						size="small"
-						class="action-btn"
-						:prepend-icon="action.icon"
-						@click="handleAction(action.key)"
-					>
-						{{ action.label }}
-					</v-btn>
 				</v-col>
 			</v-row>
 		</v-card>
@@ -77,13 +64,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
 import { useInvoiceStore } from "@/posapp/stores/invoiceStore";
+import { useUIStore } from "../../stores/uiStore.js";
+import { ensurePosProfile } from "../../../utils/pos_profile";
+import {
+	fetchRestaurantTableStatus,
+	type RestaurantTableStatus,
+	type RestaurantTableStatusEntry,
+	type RestaurantTableStatusMap,
+} from "../../utils/restaurantTableStatus";
+import {
+	findRestaurantTableStatusEntry,
+	resumeRestaurantTableOrder,
+	startNewRestaurantTableSession,
+} from "../../utils/resumeRestaurantTableOrder";
 
 declare const frappe: any;
-
-type RestaurantTableStatus = "Vacant" | "Occupied" | "Bill-Cut";
+declare const __: (text: string, args?: any[]) => string;
 
 type RestaurantTable = {
 	name: string;
@@ -95,10 +95,13 @@ type RestaurantTable = {
 
 const router = useRouter();
 const invoiceStore = useInvoiceStore();
+const uiStore = useUIStore();
+const { posProfile } = storeToRefs(uiStore);
 
 const selectedFloor = ref("PALUTO");
 const floors = ref(["PALUTO"]);
 const tableStatuses = ref<Record<string, RestaurantTableStatus>>({});
+const tableStatusDetails = ref<RestaurantTableStatusMap>({});
 
 const legend = [
 	{ label: "VACANT", status: "Vacant" as RestaurantTableStatus },
@@ -106,23 +109,60 @@ const legend = [
 	{ label: "BILL-CUT", status: "Bill-Cut" as RestaurantTableStatus },
 ];
 
-const actions = [
-	{
-		key: "customer_time_info",
-		label: "CUSTOMER TIME INFO",
-		icon: "mdi-clock-outline",
-	},
-	{ key: "reservation", label: "RESERVATION", icon: "mdi-calendar-check" },
-	{ key: "payment_form", label: "PAYMENT FORM", icon: "mdi-credit-card-outline" },
-	{ key: "manage_table", label: "MANAGE TABLE", icon: "mdi-table-chair" },
-	{ key: "manage_item", label: "MANAGE ITEM", icon: "mdi-food" },
-	{ key: "refresh", label: "REFRESH", icon: "mdi-refresh" },
-];
+function parsePositiveInt(value: unknown, fallback: number): number {
+	const n =
+		typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+	if (!Number.isFinite(n) || n < 1) {
+		return fallback;
+	}
+	return Math.min(n, 500);
+}
+
+function receptionistRoleSet(profile: Record<string, unknown> | null): Set<string> {
+	const raw = profile?.posa_paluto_receptionist_roles;
+	if (typeof raw !== "string" || !raw.trim()) {
+		return new Set(["receptionist"]);
+	}
+	return new Set(raw.split(",").map((s) => s.trim()).filter(Boolean));
+}
+
+function userHasReceptionistRole(profile: Record<string, unknown> | null): boolean {
+	const roles = profile?.posa_user_roles;
+	if (!Array.isArray(roles)) {
+		return false;
+	}
+	const roleSet = new Set(roles.map((r) => String(r)));
+	for (const need of receptionistRoleSet(profile)) {
+		if (roleSet.has(need)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** Paluto: receptionist ~70 tables, others ~150 when `posa_paluto_mode` is set on POS Profile. */
+const tableSlotCount = computed(() => {
+	const p = posProfile.value as Record<string, unknown> | null;
+	if (!p?.posa_paluto_mode) {
+		return 70;
+	}
+	const recv = parsePositiveInt(p.posa_paluto_receptionist_table_count, 70);
+	const def = parsePositiveInt(p.posa_paluto_default_table_count, 150);
+	return userHasReceptionistRole(p) ? recv : def;
+});
+
+function resolveTableStatus(label: string): RestaurantTableStatus {
+	return (
+		tableStatuses.value[label] ||
+		tableStatusDetails.value[label]?.status ||
+		"Vacant"
+	);
+}
 
 const displayTables = computed(() => {
-	return Array.from({ length: 70 }, (_, index) => {
+	return Array.from({ length: tableSlotCount.value }, (_, index) => {
 		const label = `P-${index + 1}`;
-		const status = tableStatuses.value[label] || "Vacant";
+		const status = resolveTableStatus(label);
 
 		return {
 			name: label,
@@ -148,54 +188,106 @@ function statusColor(status: RestaurantTableStatus) {
 	return "#9a5a24";
 }
 
+function applyTableStatusMap(statusMap: RestaurantTableStatusMap) {
+	const nextStatuses: Record<string, RestaurantTableStatus> = {};
+	for (const [key, entry] of Object.entries(statusMap)) {
+		const label = (entry?.restaurant_table_label || key).trim();
+		if (!label || !entry?.status || entry.status === "Vacant") {
+			continue;
+		}
+		nextStatuses[label] = entry.status;
+	}
+	tableStatusDetails.value = statusMap;
+	tableStatuses.value = nextStatuses;
+}
+
 async function fetchTables() {
-	// No Restaurant Table DocType exists yet, so keep local table numbers for now.
+	const profile = await ensurePosProfile();
+	if (profile) {
+		uiStore.setPosProfile(profile as any);
+	}
+
+	try {
+		const statusMap = await fetchRestaurantTableStatus({
+			company: profile?.company,
+			posProfile: profile?.name,
+			floor: selectedFloor.value,
+		});
+		applyTableStatusMap(statusMap);
+	} catch (error) {
+		console.error("Failed to load restaurant table status:", error);
+		frappe.show_alert({
+			message: __("Unable to refresh table status"),
+			indicator: "orange",
+		});
+	}
+}
+
+onMounted(() => {
+	fetchTables();
+});
+
+function getTableStatusEntry(table: RestaurantTable): RestaurantTableStatusEntry | null {
+	return findRestaurantTableStatusEntry(
+		tableStatusDetails.value,
+		table.name,
+		table.label,
+	);
 }
 
 async function selectTable(table: RestaurantTable) {
-	invoiceStore.mergeInvoiceDoc({
-		restaurant_table: table.name,
-		restaurant_table_label: table.label,
-		restaurant_floor: table.floor,
-	} as any);
-	tableStatuses.value = {
-		...tableStatuses.value,
-		[table.label]: "Occupied",
+	const profile = (await ensurePosProfile()) || posProfile.value;
+	const status = resolveTableStatus(table.label);
+	const entry = getTableStatusEntry(table);
+	const routeQuery: Record<string, string> = {
+		table_id: table.name,
+		table_label: table.label,
+		floor: table.floor,
 	};
 
-	await router.push({
-		path: "/pos",
-		query: {
-			table_id: table.name,
-			table_label: table.label,
-			floor: table.floor,
-		},
-	});
-}
-
-function handleAction(key: string) {
-	if (key === "refresh") {
-		fetchTables();
-		return;
-	}
-
-	if (key === "manage_table") {
+	if (status !== "Vacant" && status !== "Occupied") {
 		frappe.show_alert({
-			message: "Restaurant Table DocType is not created yet.",
+			message: __(
+				"This table has a billed order. Open it from invoice management or complete payment.",
+			),
 			indicator: "orange",
 		});
 		return;
 	}
 
-	if (key === "manage_item") {
-		frappe.set_route("List", "Item");
+	if (status === "Occupied" && entry?.invoice_name && profile) {
+		try {
+			await resumeRestaurantTableOrder({
+				tableId: table.name,
+				tableLabel: table.label,
+				floor: table.floor,
+				company: profile.company as string | undefined,
+				posProfile: profile as Record<string, unknown>,
+				invoiceStore,
+				uiStore,
+			});
+			routeQuery.order_saved = "1";
+		} catch (error) {
+			console.error("Failed to resume restaurant table order:", error);
+			frappe.show_alert({
+				message: __("Unable to open saved table order"),
+				indicator: "red",
+			});
+			return;
+		}
+
+		await router.push({ path: "/pos", query: routeQuery });
 		return;
 	}
 
-	frappe.show_alert({
-		message: `${key.replaceAll("_", " ")} is not wired yet.`,
-		indicator: "blue",
+	invoiceStore.clear();
+	startNewRestaurantTableSession(invoiceStore, {
+		name: table.name,
+		label: table.label,
+		floor: table.floor,
 	});
+
+	await router.push({ path: "/pos", query: routeQuery });
 }
 </script>
 
@@ -240,21 +332,6 @@ function handleAction(key: string) {
 	height: 18px;
 	border-radius: 4px;
 	border: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-.action-wrap {
-	display: flex;
-	justify-content: flex-end;
-	gap: 8px;
-	flex-wrap: wrap;
-}
-
-.action-btn {
-	background: linear-gradient(180deg, #2f88d8, #1669ad);
-	color: #fff;
-	font-size: 11px;
-	font-weight: 700;
-	border-radius: 10px;
 }
 
 .table-grid {
@@ -323,10 +400,6 @@ function handleAction(key: string) {
 }
 
 @media (max-width: 960px) {
-	.action-wrap {
-		justify-content: flex-start;
-	}
-
 	.table-card {
 		width: 76px;
 		height: 56px;

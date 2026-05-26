@@ -286,6 +286,26 @@ watch(
 	},
 );
 
+watch(
+    () => props.totalAmount,
+    (newTotal) => {
+        if (!paymentLines.value.length) return;
+
+        // Find the default or first payment line
+        const defaultPayment = paymentLines.value.find((p) => p.default) || paymentLines.value[0];
+        if (!defaultPayment) return;
+
+        // Only auto-update if no other payment lines have been manually set
+        const otherPaymentsTotal = paymentLines.value
+            .filter((p) => p !== defaultPayment)
+            .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+        // Recalculate default payment to cover the new total minus other payments
+        const newDefaultAmount = Math.max(newTotal - otherPaymentsTotal, 0);
+        defaultPayment.amount = flt(newDefaultAmount, currency_precision.value);
+    }
+);
+
 watch(printInvoice, () => {
 	fetchPrintFormats();
 });
@@ -350,10 +370,14 @@ function set_full_amount(payment) {
 }
 
 function set_rest_amount(payment) {
-	// If payment is 0 and there's remaining amount, auto-fill
-	if (payment.amount === 0 && remainingAmount.value > 0) {
-		payment.amount = remainingAmount.value;
-	}
+    // Recalculate remaining based on current totalAmount
+    const currentRemaining = props.totalAmount - paymentLines.value
+        .filter((p) => p !== payment)
+        .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+    if (payment.amount === 0 && currentRemaining > 0) {
+        payment.amount = flt(currentRemaining, currency_precision.value);
+    }
 }
 
 function handlePaymentAmountChange(payment, event) {

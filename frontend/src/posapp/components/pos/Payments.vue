@@ -67,6 +67,7 @@
 							@request-payment="request_payment"
 							@set-rest-amount="set_rest_amount"
 							@open-gift-card="openGiftCardDialog"
+							@update-card-detail="handleCardDetailUpdate"
 						/>
 						<PaymentGiftCardSection
 							:enabled="Boolean(pos_profile?.posa_use_gift_cards)"
@@ -143,6 +144,9 @@
 								}
 							"
 							@new-address="new_address"
+						/>
+						<PaymentSpecialDiscountDetails
+							:invoice-doc="invoice_doc"
 						/>
 						<PaymentPurchaseOrder
 							:invoice-doc="invoice_doc"
@@ -323,6 +327,7 @@ import PaymentCustomerCreditDetails from "./payments/PaymentCustomerCreditDetail
 import PaymentOptions from "./payments/PaymentOptions.vue";
 import PaymentSelectionFields from "./payments/PaymentSelectionFields.vue";
 import PaymentDialogs from "./payments/PaymentDialogs.vue";
+import PaymentSpecialDiscountDetails from "./payments/PaymentSpecialDiscountDetails.vue";
 
 const props = defineProps({
 	dialogMode: {
@@ -401,6 +406,15 @@ const giftCardLoading = ref(false);
 const giftCardMode = ref("redeem");
 const giftCardError = ref("");
 const giftCardRedemptions = ref([]);
+
+const isCardModeName = (mop) => {
+    const name = String(mop || "").toLowerCase();
+    return name.includes("credit card") || name.includes("debit card");
+};
+
+const handleCardDetailUpdate = (payment, field, value) => {
+    payment[field] = value;
+};
 
 // Computed Properties
 const invoice_doc = computed({
@@ -563,7 +577,6 @@ const {
 	set_full_amount,
 	set_rest_amount,
 	request_payment,
-	autoBalancePayments,
 	getVisibleDenominations,
 	isCashLikePayment,
 } = usePaymentMethods({
@@ -1300,14 +1313,10 @@ const handlePaymentAmountChange = (payment, event) => {
 	if (invoice_doc.value?.is_return && payment.amount > 0) {
 		payment.amount = -payment.amount;
 	}
-	if (payment.base_amount !== undefined && invoice_doc.value?.is_return) {
+	if (payment.base_amount !== undefined) {
 		const conversion_rate = invoice_doc.value.conversion_rate || 1;
 		payment.base_amount = flt(payment.amount * conversion_rate, currency_precision.value);
 	}
-
-	nextTick(() => {
-		autoBalancePayments(payment);
-	});
 };
 
 const setPaymentToDenomination = (payment, amount) => {
@@ -1317,9 +1326,6 @@ const setPaymentToDenomination = (payment, amount) => {
 		payment.base_amount = flt(amount * conversion_rate, currency_precision.value);
 	}
 	last_payment_change_was_cash.value = isCashLikePayment(payment);
-	nextTick(() => {
-		autoBalancePayments(payment);
-	});
 };
 
 // UI Feedback Methods
@@ -1504,6 +1510,54 @@ const submitInvoiceWrapper = async (print, callbackOverrides = {}, options = {})
 	if (submissionInFlight.value) {
 		return;
 	}
+
+	// ── Card detail validation ──────────────────────────────────────────
+	const cardPayments = (invoice_doc.value?.payments || []).filter(
+        (p) => isCardModeName(p.mode_of_payment) && Math.abs(flt(p.amount || 0, currency_precision.value)) > 0,
+    );
+	
+    for (const p of cardPayments) {
+		const mop = p.mode_of_payment.toLowerCase()
+
+        if (!p.posa_card_type) {
+            toastStore.show({ title: __("Card Type is required for {0}", [p.mode_of_payment]), color: "error" });
+            return;
+        }
+
+		if (!p.posa_batch_no){
+			toastStore.show({ title: __("Batch No. is required for {0}", [p.mode_of_pamynet]), color: "error" })
+		}
+
+		if (!p.posa_approval_no){
+			toastStore.show({ title: __("Approval No. is required for {0}", [p.mode_of_pamynet]), color: "error" })
+		}
+        if ((mop.includes("credit card") || mop.includes("debit card") ) && !/^\d{4}$/.test(p.posa_card_last4 || "")) {
+            toastStore.show({ title: __("Last 4 card digits are required for {0}", [p.mode_of_payment]), color: "error" });
+            return;
+        }
+        if (!p.posa_card_ref?.trim()) {
+            toastStore.show({ title: __("Transaction reference is required for {0}", [p.mode_of_payment]), color: "error" });
+            return;
+        }
+    }
+
+	if (invoice_doc.value) {
+        const firstCard = cardPayments[0];
+        if (firstCard) {
+            invoice_doc.value.custom_card_type = firstCard.posa_card_type  || "";
+            invoice_doc.value.custom_card_number_last_4_digits = firstCard.posa_card_last4 || "";
+            invoice_doc.value.custom_reference_number = firstCard.posa_card_ref   || "";
+            invoice_doc.value.custom_batch_no = firstCard.posa_batch_no   || "";
+            invoice_doc.value.custom_approval_no = firstCard.posa_approval_no   || "";
+        } else {
+            // Clear the fields if no card payment is present (e.g. user switched to cash)
+            invoice_doc.value.custom_card_type = "";
+            invoice_doc.value.custom_card_number_last_4_digits = "";
+            invoice_doc.value.custom_reference_number = "";
+			invoice_doc.value.custom_batch_no =  "";
+            invoice_doc.value.custom_approval_no = "";
+        }
+    }
 
 	submissionInFlight.value = true;
 	loading.value = true;
@@ -1920,6 +1974,13 @@ onMounted(() => {
 			is_credit_return.value = false;
 			return_valid_upto_date.value = null;
 			resetGiftCardState({ clearPayment: true });
+
+			    // Clear card fields on the new blank doc if one exists
+			if (invoice_doc.value) {
+				invoice_doc.value.custom_card_type                = "";
+				invoice_doc.value.custom_card_number_last_4_digits = "";
+				invoice_doc.value.custom_reference_number          = "";
+			}
 		});
 	}
 

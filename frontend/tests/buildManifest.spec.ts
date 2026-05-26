@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildVersionPayload, getEntryFileName } from "../build-manifest.js";
+import {
+	buildVersionPayload,
+	getEntryFileName,
+	stampPosawesomeEntryImports,
+} from "../build-manifest.js";
 
 describe("build manifest helpers", () => {
 	it("keeps primary shell entries stable while hashing auxiliary entries", () => {
@@ -31,6 +35,13 @@ describe("build manifest helpers", () => {
 					"/assets/posawesome/dist/js/offline/index-AbCd1234.js",
 			},
 		});
+	});
+
+	it("cache-busts posawesome entry imports inside lazy chunks", () => {
+		const input = `import{G as t}from"./posawesome.js";import("./posawesome.js");`;
+		expect(stampPosawesomeEntryImports(input, "build-2000")).toBe(
+			`import{G as t}from"./posawesome.js?v=build-2000";import("./posawesome.js?v=build-2000");`,
+		);
 	});
 
 	it("cache-busts stable shell asset URLs with the build version", () => {

@@ -2,9 +2,9 @@
 	<tr class="posa-cart-item-row" v-memo="memoDeps">
 		<template v-for="column in visibleColumns" :key="column.key">
 			<!-- Item Name Column -->
-			<td v-if="column.key === 'item_name'" class="text-start" :data-column-key="'item_name'">
+			<td v-if="column.key === 'item_name'" class="text-start posa-cart-item-name-cell" :data-column-key="'item_name'">
 				<div class="d-flex align-center">
-					<span>{{ item.item_name }}</span>
+					<span class="posa-cart-item-name text-high-emphasis font-weight-bold">{{ item.item_name }}</span>
 					<v-chip v-if="item.is_bundle" color="secondary" size="x-small" class="ml-1">
 						{{ __("Bundle") }}
 					</v-chip>
@@ -75,7 +75,6 @@
 			<td v-else-if="column.key === 'qty'" class="text-center" :data-column-key="'qty'">
 				<div class="posa-cart-table__qty-counter" :class="{ 'rtl-layout': isRTL }">
 					<v-btn
-						:disabled="disableDecrement"
 						size="small"
 						variant="flat"
 						class="posa-cart-table__qty-btn posa-cart-table__qty-btn--minus minus-btn qty-control-btn"
@@ -86,7 +85,7 @@
 					</v-btn>
 					<div
 						v-if="!isEditingQty"
-						class="posa-cart-table__qty-display amount-value number-field-rtl"
+						class="posa-cart-table__qty-display amount-value number-field-rtl text-white"
 						:class="{
 							'negative-number': isNegative(item.qty),
 							'large-number': qtyLength > 6,
@@ -117,7 +116,6 @@
 						:disabled="disableInput"
 					></v-text-field>
 					<v-btn
-						:disabled="disableIncrement"
 						size="small"
 						variant="flat"
 						class="posa-cart-table__qty-btn posa-cart-table__qty-btn--plus plus-btn qty-control-btn"
@@ -130,7 +128,7 @@
 			</td>
 
 			<!-- UOM Column (Optional) -->
-			<td v-else-if="column.key === 'uom'" class="text-center" :data-column-key="'uom'">
+			<td v-else-if="column.key === 'uom'" class="text-center posa-cart-uom-cell" :data-column-key="'uom'">
 				<div class="posa-cart-table__editor-box uom-editor" @click.stop>
 					<v-btn
 						size="x-small"
@@ -151,7 +149,7 @@
 						role="button"
 						:aria-label="__('Edit unit of measure')"
 					>
-						<span>{{ item.uom }}</span>
+						<span class="text-medium-emphasis font-weight-medium">{{ item.uom }}</span>
 					</div>
 
 					<v-select
@@ -355,35 +353,29 @@
 
 			<!-- Actions -->
 			<td v-else-if="column.key === 'actions'" class="text-center" :data-column-key="'actions'">
-				<v-btn
-					:disabled="!!item.posa_is_replace"
-					size="small"
-					variant="flat"
-					class="posa-cart-table__delete-btn delete-action-btn"
-					@click.stop="$emit('remove-item', item)"
-					:aria-label="__('Remove item')"
-				>
-					<v-icon size="small">mdi-delete-outline</v-icon>
-				</v-btn>
-			</td>
-
-			<td
-				v-else-if="column.key === 'data-table-expand'"
-				class="text-center"
-				:data-column-key="'data-table-expand'"
-			>
-				<v-btn
-					icon
-					size="small"
-					variant="text"
-					class="posa-cart-table__expand-btn"
-					@click.stop="$emit('toggle-expand')"
-					:aria-label="isExpanded ? __('Collapse item details') : __('Expand item details')"
-				>
-					<v-icon size="small">
-						{{ isExpanded ? "mdi-chevron-up" : "mdi-chevron-down" }}
-					</v-icon>
-				</v-btn>
+				<div class="posa-cart-table__actions">
+					<v-btn
+						icon
+						size="small"
+						variant="text"
+						color="primary"
+						class="posa-cart-table__details-btn"
+						@click.stop="$emit('open-item-details', item)"
+						:aria-label="__('Item details')"
+					>
+						<v-icon size="small">mdi-information-outline</v-icon>
+					</v-btn>
+					<v-btn
+						:disabled="!!item.posa_is_replace"
+						size="small"
+						variant="flat"
+						class="posa-cart-table__delete-btn delete-action-btn"
+						@click.stop="$emit('remove-item', item)"
+						:aria-label="__('Remove item')"
+					>
+						<v-icon size="small">mdi-delete-outline</v-icon>
+					</v-btn>
+				</div>
 			</td>
 		</template>
 	</tr>
@@ -419,7 +411,6 @@ const props = defineProps({
 	isNegative: Function,
 	hideQtyDecimals: Boolean,
 	isRTL: Boolean,
-	isExpanded: Boolean,
 });
 
 const emit = defineEmits([
@@ -433,7 +424,7 @@ const emit = defineEmits([
 	"update-discount-percent",
 	"update-discount-amount",
 	"toggle-offer",
-	"toggle-expand",
+	"open-item-details",
 	"remove-item",
 ]);
 
@@ -456,7 +447,7 @@ const discountAmountInput = ref(null);
 const uomSelect = ref(null);
 
 const memoDeps = computed(() => {
-	const deps = [
+	return [
 		props.item.qty,
 		props.item.rate,
 		props.item.amount,
@@ -472,7 +463,6 @@ const memoDeps = computed(() => {
 		props.item.posa_offer_applied,
 		props.item.is_free_item,
 		props.item.price_list_rate,
-		props.isExpanded,
 		props.visibleColumns.map((column) => column?.key).join("|"),
 		// Include edit states to ensure UI updates when switching modes
 		isEditingQty.value,
@@ -481,13 +471,6 @@ const memoDeps = computed(() => {
 		isEditingDiscountPercent.value,
 		isEditingDiscountAmount.value,
 	];
-	console.log(`[CartItemRow] memoDeps updated for ${props.item.item_code}`, {
-		uom: props.item.uom,
-		rate: props.item.rate,
-		price_list_rate: props.item.price_list_rate,
-		qty: props.item.qty,
-	});
-	return deps;
 });
 
 const qtyLength = computed(() => String(Math.abs(props.item.qty || 0)).replace(".", "").length);
@@ -574,12 +557,6 @@ function changeUom(direction) {
 	}
 
 	const newUom = uoms[newIndex];
-	console.log("[CartItemRow] changeUom", {
-		item: props.item.item_code,
-		direction,
-		old_uom: props.item.uom,
-		new_uom: newUom,
-	});
 	if (newUom !== props.item.uom) {
 		emit("calc-uom", props.item, newUom);
 	}
@@ -587,11 +564,6 @@ function changeUom(direction) {
 
 function handleUomSelect(newUom) {
 	if (disableUomEdit.value) return;
-	console.log("[CartItemRow] handleUomSelect", {
-		item: props.item.item_code,
-		old_uom: props.item.uom,
-		new_uom: newUom,
-	});
 	if (newUom && newUom !== props.item.uom) {
 		emit("calc-uom", props.item, newUom);
 	}
@@ -730,5 +702,22 @@ td {
 	outline: 2px solid var(--pos-primary);
 	outline-offset: 2px;
 	z-index: 10;
+}
+
+.posa-cart-table__actions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+}
+
+.posa-cart-item-name {
+	font-size: 0.98rem;
+	line-height: 1.35;
+	color: rgba(255, 255, 255, 0.96);
+}
+
+.posa-cart-uom-cell .posa-cart-table__editor-display {
+	color: rgba(255, 255, 255, 0.72);
 }
 </style>

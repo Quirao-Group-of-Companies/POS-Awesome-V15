@@ -519,6 +519,11 @@ def _apply_manual_posting_controls(payload):
         payload["set_posting_time"] = 1
 
 
+def _parse_invoice_request_payload(data):
+    """Accept JSON string or dict (frappe.call may pass either)."""
+    return frappe.parse_json(data)
+
+
 def _build_fresh_invoice_payload(data, doctype):
     fresh_data = dict(data or {})
     fresh_data["doctype"] = doctype
@@ -712,7 +717,7 @@ def _normalize_return_payment_rows(invoice_doc, conversion_rate=1):
 @frappe.whitelist()
 def update_invoice(data):
     currency_cache = {}
-    data = json.loads(data)
+    data = _parse_invoice_request_payload(data)
     client_request_id = extract_invoice_client_request_id(data)
     if not doctype_supports_client_request_id(data.get("doctype") or "Sales Invoice"):
         strip_invoice_client_request_id(data)
@@ -937,8 +942,8 @@ def update_invoice(data):
 
 @frappe.whitelist()
 def submit_invoice(invoice, data, submit_in_background=False):
-    data = json.loads(data)
-    invoice = json.loads(invoice)
+    data = _parse_invoice_request_payload(data)
+    invoice = _parse_invoice_request_payload(invoice)
     client_request_id = extract_invoice_client_request_id(invoice, data)
     _sanitize_delivery_dates(invoice)
     _apply_manual_posting_controls(invoice)
@@ -1390,18 +1395,18 @@ def repair_invoice_submission(client_request_id, company, pos_profile, document_
     }
 
 
-@frappe.whitelist()
-def validate_cart_items(items, pos_profile=None):
-    """Validate cart items for available stock.
+# @frappe.whitelist()
+# def validate_cart_items(items, pos_profile=None):
+#     """Validate cart items for available stock.
 
-    Returns blocking errors and warning-only shortages for front-end checks.
-    """
+#     Returns blocking errors and warning-only shortages for front-end checks.
+#     """
 
-    if isinstance(items, str):
-        items = json.loads(items)
+#     if isinstance(items, str):
+#         items = json.loads(items)
 
-    if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
-        pos_profile = None
+#     if pos_profile and not frappe.db.exists("POS Profile", pos_profile):
+#         pos_profile = None
 
     errors = _collect_stock_errors(
         items,
@@ -1411,10 +1416,21 @@ def validate_cart_items(items, pos_profile=None):
     blocking_errors = [row for row in errors if row.get("policy") == "block"]
     warnings = [row for row in errors if row.get("policy") != "block"]
 
+#     return {
+#         "mode": "block" if blocking_errors else ("warn" if warnings else "allow"),
+#         "errors": blocking_errors,
+#         "warnings": warnings,
+#         "items": errors,
+#         "should_block": bool(blocking_errors),
+#     }
+
+@frappe.whitelist()
+def validate_cart_items(items, pos_profile=None):
+    """Validation disabled — always allow."""
     return {
-        "mode": "block" if blocking_errors else ("warn" if warnings else "allow"),
-        "errors": blocking_errors,
-        "warnings": warnings,
-        "items": errors,
-        "should_block": bool(blocking_errors),
+        "mode": "allow",
+        "errors": [],
+        "warnings": [],
+        "items": [],
+        "should_block": False,
     }

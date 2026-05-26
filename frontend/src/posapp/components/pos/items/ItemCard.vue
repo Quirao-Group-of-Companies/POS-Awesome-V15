@@ -1,11 +1,15 @@
 <template>
 	<div
 		:class="['card-item-card', { 'item-highlighted': isItemHighlighted }]"
+		:style="{ '--card-accent-color': categoryAccent.borderColor }"
 		@click="onClick"
 		:draggable="true"
 		@dragstart="onDragStart"
 		@dragend="onDragEnd"
 	>
+		<div v-if="categoryAccent" class="card-item-category-strip" aria-hidden="true">
+			<v-icon size="14" :color="categoryAccent.color" :icon="categoryAccent.icon" />
+		</div>
 		<div class="card-item-image-container">
 			<v-img
 				:src="item.image || placeholderImage"
@@ -15,23 +19,25 @@
 			>
 				<template #placeholder>
 					<div class="image-placeholder">
-						<v-icon size="40" color="grey-lighten-2"> mdi-image </v-icon>
+						<v-icon size="40" color="grey-lighten-1"> mdi-image </v-icon>
 					</div>
 				</template>
 			</v-img>
 		</div>
 		<div class="card-item-content">
 			<div class="card-item-header">
-				<h4 class="card-item-name">{{ item.item_name }}</h4>
-				<span class="card-item-code">{{ item.item_code }}</span>
+				<h4 class="card-item-name text-high-emphasis font-weight-bold">
+					{{ item.item_name }}
+				</h4>
+				<span class="card-item-code text-medium-emphasis">{{ item.item_code }}</span>
 			</div>
 			<div class="card-item-details">
 				<div class="card-item-price">
-					<div class="primary-price">
-						<span class="currency-symbol">
+					<div class="primary-price text-high-emphasis">
+						<span class="currency-symbol text-medium-emphasis">
 							{{ currencySymbol(primaryCurrency) }}
 						</span>
-						<span class="price-amount">
+						<span class="price-amount font-weight-bold">
 							{{ formatCurrency(primaryRate, primaryCurrency, primaryPrecision) }}
 						</span>
 						<ItemRateInfoMenu
@@ -42,7 +48,7 @@
 							:rate-precision="ratePrecision"
 						/>
 					</div>
-					<div v-if="showSecondaryPrice" class="secondary-price">
+					<div v-if="showSecondaryPrice" class="secondary-price text-medium-emphasis">
 						<span class="currency-symbol">
 							{{ currencySymbol(secondaryCurrency) }}
 						</span>
@@ -51,17 +57,17 @@
 						</span>
 					</div>
 				</div>
-				<div class="card-item-stock">
+				<div class="card-item-stock text-medium-emphasis">
 					<v-icon size="small" class="stock-icon"> mdi-package-variant </v-icon>
 					<span
-						class="stock-amount"
+						class="stock-amount text-high-emphasis font-weight-bold"
 						:class="{
 							'negative-number': isNegative(item.actual_qty),
 						}"
 					>
 						{{ formattedActualQty }}
 					</span>
-					<span class="stock-uom">{{ item.stock_uom || "" }}</span>
+					<span class="stock-uom text-medium-emphasis">{{ item.stock_uom || "" }}</span>
 				</div>
 			</div>
 		</div>
@@ -72,6 +78,7 @@
 import { computed } from "vue";
 import placeholderImage from "../placeholder-image.png";
 import ItemRateInfoMenu from "./ItemRateInfoMenu.vue";
+import { getItemCategoryAccent } from "../../../utils/itemCategoryAccent";
 
 const props = defineProps({
 	item: { type: Object, required: true },
@@ -90,6 +97,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["click", "dragstart", "dragend"]);
+
+const categoryAccent = computed(() => getItemCategoryAccent(props.item));
 
 const primaryCurrency = computed(() => {
 	if (props.context === "purchase") {
@@ -177,12 +186,54 @@ const onDragEnd = (event) => {
 	backface-visibility: hidden;
 	transform: translate3d(0, 0, 0);
 	position: relative;
+	--card-accent-color: transparent;
+}
+
+.card-item-card::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 4px;
+	background: var(--card-accent-color);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 1;
+	pointer-events: none;
+}
+
+.card-item-category-strip {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	z-index: 2;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 999px;
+	background: rgba(0, 0, 0, 0.45);
+	backdrop-filter: blur(4px);
+	opacity: 0;
+	transition: opacity 0.2s ease;
 }
 
 .card-item-card:hover {
 	transform: translate3d(0, -3px, 0);
 	box-shadow: 0 16px 32px var(--pos-shadow);
 	border-color: rgba(var(--v-theme-primary), 0.35);
+}
+
+.card-item-card:hover::before,
+.card-item-card.item-highlighted::before {
+	opacity: 1;
+}
+
+.card-item-card:hover .card-item-category-strip,
+.card-item-card.item-highlighted .card-item-category-strip {
+	opacity: 1;
 }
 
 .card-item-card.item-highlighted {
@@ -205,11 +256,10 @@ const onDragEnd = (event) => {
 .card-item-image {
 	width: 100%;
 	height: 100%;
-	object-fit: contain; /* Changed to contain to ensure full image visibility */
+	object-fit: contain;
 	background-color: rgb(var(--v-theme-surface-bright));
 }
 
-/* Image Placeholder Style */
 .image-placeholder {
 	display: flex;
 	align-items: center;
@@ -235,11 +285,10 @@ const onDragEnd = (event) => {
 }
 
 .card-item-name {
-	font-size: 0.98rem;
-	font-weight: 700;
+	font-size: 1rem;
 	margin: 0;
 	line-height: 1.35;
-	color: var(--pos-text-primary);
+	color: rgba(255, 255, 255, 0.96);
 	overflow: hidden;
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
@@ -249,19 +298,19 @@ const onDragEnd = (event) => {
 
 .card-item-code {
 	font-size: 0.74rem;
-	color: var(--pos-text-secondary);
 	display: block;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	letter-spacing: 0.02em;
+	color: rgba(255, 255, 255, 0.72);
 }
 
 .card-item-details {
 	display: flex;
 	justify-content: space-between;
 	align-items: flex-start;
-	margin-top: auto; /* Push to bottom */
+	margin-top: auto;
 	gap: var(--pos-space-2);
 }
 
@@ -277,32 +326,25 @@ const onDragEnd = (event) => {
 	align-items: baseline;
 	flex-wrap: wrap;
 	gap: var(--pos-space-1);
-	font-weight: 700;
-	color: var(--pos-primary);
 	font-size: 1.05rem;
+	color: rgba(255, 255, 255, 0.96);
 }
 
 .secondary-price {
 	font-size: 0.8rem;
-	color: var(--pos-text-secondary);
 }
 
 .card-item-stock {
 	text-align: right;
 	font-size: 0.82rem;
-	color: var(--pos-text-secondary);
 	display: flex;
 	flex-direction: row;
 	align-items: flex-end;
 	gap: 6px;
 	padding: 6px 8px;
 	border-radius: var(--pos-radius-xs);
-	background: var(--pos-hover-bg);
+	background: rgba(255, 255, 255, 0.06);
 	white-space: nowrap;
-}
-
-.stock-amount {
-	font-weight: 600;
 }
 
 .stock-amount.negative-number {
@@ -324,7 +366,7 @@ const onDragEnd = (event) => {
 	}
 
 	.card-item-name {
-		font-size: 0.85rem;
+		font-size: 0.9rem;
 	}
 
 	.card-item-code {

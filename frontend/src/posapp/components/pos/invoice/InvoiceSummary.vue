@@ -28,6 +28,13 @@
 						<strong class="summary-hero__amount">
 							{{ currencySymbol(displayCurrency) }}{{ formatCurrency(subtotal) }}
 						</strong>
+						<div class="summary-hero__service-charge">
+							<span class="summary-hero__eyebrow">{{ serviceChargeLabel }}</span>
+							<strong class="summary-hero__amount">
+								{{ currencySymbol(displayCurrency) }}{{ formatCurrency(serviceChargeAmount) }}
+							</strong>
+						</div>
+						
 						<div class="summary-hero__meta">
 							<span
 								>{{ formatFloat(total_qty, hide_qty_decimals ? 0 : undefined) }}
@@ -90,6 +97,8 @@
 			<v-col cols="12" :md="useCompactSaleDock ? 12 : 5" class="invoice-summary-actions">
 				<InvoiceActionButtons
 					:pos_profile="pos_profile"
+					:restaurant-save-only="restaurantSaveOnlyMode"
+					:restaurant-table-active="restaurantTableActive"
 					:saveLoading="saveLoading"
 					:loadDraftsLoading="loadDraftsLoading"
 					:selectOrderLoading="selectOrderLoading"
@@ -100,6 +109,7 @@
 					:printLoading="printLoading"
 					:paymentLoading="paymentLoading"
 					:customerDisplayLoading="customerDisplayLoading"
+					@save-order="handleSaveOrder"
 					@save-and-clear="handleSaveAndClear"
 					@load-drafts="handleLoadDrafts"
 					@select-order="handleSelectOrder"
@@ -188,6 +198,7 @@ import { storeToRefs } from "pinia";
 import { loadItemSelectorSettings } from "../../../utils/itemSelectorSettings";
 import { useResponsive } from "../../../composables/core/useResponsive";
 import { useUIStore } from "../../../stores/uiStore";
+import { useInvoiceStore } from "../../../stores/invoiceStore";
 import {
 	getAvailableDocumentSources,
 	getDefaultDocumentSource,
@@ -216,12 +227,16 @@ const props = defineProps({
 	discount_percentage_offer_name: [String, Number],
 	isNumber: Function,
 	return_discount_meta: Object,
+	service_charge_rate: { type: Number, default: 0.05 },
+	service_charge_percent: { type: Number, default: 5 },
 });
 
 const emit = defineEmits([
 	"update:additional_discount",
 	"update:additional_discount_percentage",
 	"update_discount_umount",
+	"update:service_charge",
+	"save-order",
 	"save-and-clear",
 	"load-drafts",
 	"select-order",
@@ -250,7 +265,12 @@ const desktopDraftsDrawer = ref(false);
 const mobileDraftsDialog = ref(false);
 const responsive = useResponsive();
 const uiStore = useUIStore();
+const invoiceStore = useInvoiceStore();
 const { parkedOrders, draftSource } = storeToRefs(uiStore);
+const { restaurantSaveOnlyMode, isRestaurantTableOrder } = storeToRefs(invoiceStore);
+const restaurantTableActive = computed(
+	() => isRestaurantTableOrder.value && !restaurantSaveOnlyMode.value,
+);
 
 const additionalDiscountDisplay = ref(normalizeAdditionalDiscountDisplay(props.additional_discount));
 const additionalDiscountPercentageDisplay = ref(
@@ -264,6 +284,27 @@ const showReturnDiscountAlert = computed(
 		!props.pos_profile?.posa_use_percentage_discount &&
 		!isFullReturnDiscount(props.return_discount_meta?.ratio),
 );
+const resolvedServiceChargeRate = computed(() => {
+	const rate = Number(props.service_charge_rate);
+	if (Number.isFinite(rate) && rate >= 0) {
+		return rate;
+	}
+	const percent = Number(props.service_charge_percent);
+	return Number.isFinite(percent) && percent >= 0 ? percent / 100 : 0.05;
+});
+
+const serviceChargeLabel = computed(() => {
+	const percent = Number(props.service_charge_percent);
+	const displayPercent =
+		Math.round(Number.isFinite(percent) && percent >= 0
+			? percent
+			: resolvedServiceChargeRate.value * 100);
+	return __("Service Charge ({0}%)", [displayPercent]);
+});
+
+const serviceChargeAmount = computed(() => {
+	return props.subtotal * resolvedServiceChargeRate.value;
+});
 const allDrafts = computed(() => (Array.isArray(parkedOrders.value) ? parkedOrders.value : []));
 const availableDraftSources = computed(() => getAvailableDocumentSources(props.pos_profile));
 const showDraftSourceSelector = computed(() => shouldShowDocumentSourceSelector(availableDraftSources.value));
@@ -287,6 +328,15 @@ const hide_qty_decimals = computed(() => {
 	const opts = loadItemSelectorSettings();
 	return !!opts?.hide_qty_decimals;
 });
+
+watch(
+	() => [props.subtotal, resolvedServiceChargeRate.value],
+	([newTotal]) => {
+		const charge = Number(newTotal) * resolvedServiceChargeRate.value;
+		emit("update:service_charge", charge);
+	},
+	{ immediate: true },
+);
 
 watch(
 	() => props.pos_profile,
@@ -398,6 +448,15 @@ function formatRatio(value) {
 function isFullReturnDiscount(value) {
 	const ratio = Number.isFinite(Number(value)) ? Number(value) : 0;
 	return Math.abs(ratio - 1) < 0.0001;
+}
+
+async function handleSaveOrder() {
+	saveLoading.value = true;
+	try {
+		await emit("save-order");
+	} finally {
+		saveLoading.value = false;
+	}
 }
 
 async function handleSaveAndClear() {
@@ -550,6 +609,15 @@ defineExpose({
 
 .sticky-summary-card--dock-safe {
 	margin-bottom: calc(var(--bottom-safe-space) + 8px);
+}
+
+.summary-hero__service-charge {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(var(--v-theme-primary), 0.12);
+    margin-top: 4px;
 }
 
 .summary-content {

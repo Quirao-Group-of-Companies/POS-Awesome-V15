@@ -1,3 +1,4 @@
+import type { AnyMxRecord } from "node:dns";
 import {
 	getTaxTemplate,
 	getTaxInclusiveSetting,
@@ -7,6 +8,108 @@ import { _getPlcConversionRate } from "./currency";
 
 declare const flt: (_value: unknown, _precision?: number) => number;
 declare const frappe: any;
+
+/** Must match SERVICE_CHARGE_TAX_DESCRIPTION in posawesome.posawesome.api.invoice */
+const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
+
+function isServiceChargeTaxRow(tax: any): boolean {
+	return (
+		tax?.charge_type === "Actual" &&
+		tax?.description === SERVICE_CHARGE_TAX_DESCRIPTION
+	);
+}
+
+function buildServiceChargeTaxRow(context: any, serviceCharge: number) {
+	if (!serviceCharge) {
+		return null;
+	}
+
+	const accountHead = context.company?.default_service_charge_account;
+	if (!accountHead) {
+		return null;
+	}
+
+	const conversionRate = context.conversion_rate || 1;
+	return {
+		account_head: accountHead,
+		charge_type: "Actual",
+		description: SERVICE_CHARGE_TAX_DESCRIPTION,
+		tax_amount: serviceCharge,
+		included_in_print_rate: 0,
+		base_tax_amount: serviceCharge * conversionRate,
+	};
+}
+
+function buildSpecialDiscountTaxRow(context: any, discountAmount: number) {
+    if (!discountAmount || discountAmount === 0) return null;
+
+    const invoice_doc = context?.invoice_doc;
+    const discount_type = invoice_doc?.custom_special_discount_type;
+    if (!discount_type) return null;
+
+    const accountMap: Record<string, string> = {
+        "Senior Citizen": context.company?.custom_default_senior_citizen_account,
+        "PWD": context.company?.custom_default_pwd_account,
+    };
+    const accountHead = accountMap[discount_type];
+    if (!accountHead) return null;
+
+    const conversionRate = context.conversion_rate || 1;
+
+    return {
+        account_head: accountHead,
+        charge_type: "Actual",
+        description: "Special Discount",
+        tax_amount: discountAmount,                      // -42 → backend subtracts it
+        included_in_print_rate: 0,
+        base_tax_amount: discountAmount * conversionRate, // -42
+    };
+}
+
+function isSpecialDiscountTaxRow(tax: any): boolean {
+    return (
+        tax?.charge_type === "Actual" &&
+        tax?.description === "Special Discount"
+    );
+}
+
+function appendServiceChargeTax(
+	doc: any,
+	context: any,
+	serviceCharge: number,
+	grandTotal: number,
+) {
+	const taxRow = buildServiceChargeTaxRow(context, serviceCharge);
+	if (!taxRow) {
+		return grandTotal;
+	}
+
+	doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+	doc.taxes.push(taxRow);
+	doc.total_taxes_and_charges = flt(
+		(doc.total_taxes_and_charges || 0) + serviceCharge,
+	);
+	return grandTotal + serviceCharge;
+}
+
+function appendSpecialDiscount(
+    doc: any,
+    context: any,
+    DiscountAmount: number,   // always negative, e.g. -42
+    grandTotal: number,
+) {
+    const taxRow = buildSpecialDiscountTaxRow(context, DiscountAmount);
+    if (!taxRow) {
+        return grandTotal;
+    }
+    doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+    doc.taxes.push(taxRow);
+    // DiscountAmount is negative, so this correctly REDUCES total_taxes_and_charges
+    doc.total_taxes_and_charges = flt(
+        (doc.total_taxes_and_charges || 0) + DiscountAmount,
+    );
+    return grandTotal + DiscountAmount;  // 210 + (-42) = 168, then +10 = 178... wait
+}
 
 function normalizeBackendDate(context: any, value: any): string | null {
 	if (value === null || typeof value === "undefined" || value === "") {
@@ -139,6 +242,7 @@ function clearStalePartyFieldsForCustomerChange(
  * - context.posa_coupons
  * - context.selected_delivery_charge
  * - context.delivery_charges_rate
+ * - context.service_charge
  * - context.formatDateForBackend (method)
  */
 
@@ -149,8 +253,18 @@ export function get_invoice_doc(context: any) {
 
 	if (sourceDoc.name) {
 		doc = { ...sourceDoc };
-	}
 
+		if (Array.isArray(doc.taxes)) {
+			doc.taxes = doc.taxes.filter(
+				(tax: any) => !isServiceChargeTaxRow(tax) && !isSpecialDiscountTaxRow(tax)
+			);
+		}
+	}
+	doc.custom_customer_count = 
+		sourceDoc.custom_customer_count ?? 
+		context.invoiceStore?.invoiceDoc?.custom_customer_count ?? 
+		1;
+		
 	// Always set these fields first
 	if (context.invoiceType === "Quotation") {
 		doc.doctype = "Quotation";
@@ -295,11 +409,28 @@ export function get_invoice_doc(context: any) {
 	// Calculate grand total with correct sign for returns
 	let grandTotal = context.subtotal;
 
+	let serviceCharge = flt(context.service_charge || sourceDoc.posa_service_charge || 0);
+	let specialDiscountAmount = -Math.abs(flt(
+		context.invoice_doc?.custom_special_discount_amount ||
+		sourceDoc.custom_special_discount_amount || 0
+	));
+	if (isReturn && serviceCharge > 0) {
+		serviceCharge = -Math.abs(serviceCharge);
+	}
+	doc.posa_service_charge = serviceCharge;
+	doc.custom_special_discount_amount = specialDiscountAmount;
+
 	// Prepare taxes array
 	doc.taxes = [];
 	if (context.invoice_doc && context.invoice_doc.taxes) {
 		let totalTax = 0;
 		context.invoice_doc.taxes.forEach((tax) => {
+			if (isServiceChargeTaxRow(tax)) {
+				return;
+			}
+			if (isSpecialDiscountTaxRow(tax)) {
+				return;
+			}
 			if (tax.tax_amount) {
 				grandTotal += flt(tax.tax_amount);
 				totalTax += flt(tax.tax_amount);
@@ -361,6 +492,12 @@ export function get_invoice_doc(context: any) {
 			}
 			doc.total_taxes_and_charges = totalTax;
 		}
+	}
+
+	grandTotal = appendSpecialDiscount(doc, context, specialDiscountAmount, grandTotal);
+	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
+	if (context.invoiceStore?.invoiceDoc) {
+		context.invoiceStore.invoiceDoc.taxes = [...doc.taxes];
 	}
 
 	if (isReturn && grandTotal > 0) grandTotal = -Math.abs(grandTotal);
@@ -448,6 +585,20 @@ export function get_invoice_doc(context: any) {
 	// Add flags to ensure proper rate handling
 	doc.ignore_pricing_rule = 0;
 
+	// Restaurant table session (Paluto) — persist on draft saves
+	const restaurantSource =
+		sourceDoc?.restaurant_table != null && sourceDoc?.restaurant_table !== ""
+			? sourceDoc
+			: context.invoiceStore?.invoiceDoc;
+	if (restaurantSource?.restaurant_table) {
+		doc.restaurant_table = restaurantSource.restaurant_table;
+		doc.restaurant_table_label = restaurantSource.restaurant_table_label;
+		doc.restaurant_floor = restaurantSource.restaurant_floor;
+		if (restaurantSource.restaurant_order_saved !== undefined) {
+			doc.restaurant_order_saved = restaurantSource.restaurant_order_saved ? 1 : 0;
+		}
+	}
+
 	// Preserve the real price list currency
 	doc.price_list_currency = context.price_list_currency;
 	doc.ignore_default_fields = 1; // Add this to prevent default field updates
@@ -503,7 +654,6 @@ export function get_invoice_doc(context: any) {
 			}
 		});
 	}
-
 	return doc;
 }
 

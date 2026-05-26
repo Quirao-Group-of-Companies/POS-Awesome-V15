@@ -3,6 +3,7 @@ import { get_invoice_doc, get_invoice_items, get_payments } from "./document";
 import { _logPriceListDebug, _buildPriceListSnapshot } from "./currency";
 import { applyReturnDiscountProration } from "./item_updates";
 import { prepareDocumentFlowAction } from "../../../utils/documentSources";
+import { applyRestaurantDefaultCustomer } from "../../../utils/restaurantCustomer";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const frappe: any;
@@ -142,7 +143,6 @@ export async function cancel_invoice(context: any) {
 	// Or assume context has the method proxied.
 	// Since we are refactoring, let's call the util directly if possible, or rely on context.
 	const doc = get_invoice_doc(context);
-
 	context.posting_date = frappe.datetime.nowdate();
 
 	if (doc.name && context.pos_profile.posa_allow_delete) {
@@ -174,11 +174,68 @@ export async function cancel_invoice(context: any) {
 	context.cancel_dialog = false;
 }
 
+export async function save_restaurant_order(context: any) {
+	applyRestaurantDefaultCustomer(context);
+	const doc = get_invoice_doc(context);
+	if (!doc?.items?.length) {
+		context.toastStore?.show?.({
+			title: __("Nothing to save"),
+			color: "error",
+		});
+		return null;
+	}
+
+	if (context.invoiceStore?.isRestaurantTableOrder) {
+		doc.restaurant_table =
+			doc.restaurant_table || context.invoiceStore.invoiceDoc?.restaurant_table;
+		doc.restaurant_table_label =
+			doc.restaurant_table_label ||
+			context.invoiceStore.invoiceDoc?.restaurant_table_label;
+		doc.restaurant_floor =
+			doc.restaurant_floor || context.invoiceStore.invoiceDoc?.restaurant_floor;
+		doc.restaurant_order_saved = 1;
+	}
+
+	try {
+		const saved = await context.update_invoice(doc);
+		if (!saved) {
+			context.toastStore?.show?.({
+				title: __("Error saving order"),
+				color: "error",
+			});
+			return null;
+		}
+
+		if (context.invoiceStore?.markRestaurantOrderSaved) {
+			context.invoiceStore.markRestaurantOrderSaved();
+		} else if (context.mergeInvoiceDoc) {
+			context.mergeInvoiceDoc({
+				name: saved.name,
+				restaurant_order_saved: 1,
+			});
+		}
+
+		context.toastStore?.show?.({
+			title: __("Order saved"),
+			summary: doc.restaurant_table_label || doc.restaurant_table || __("Table order"),
+			color: "success",
+		});
+		return saved;
+	} catch (error) {
+		console.error("Error saving restaurant order:", error);
+		context.toastStore?.show?.({
+			title: __("Error saving order"),
+			color: "error",
+		});
+		return null;
+	}
+}
+
 export async function save_and_clear_invoice(context: any) {
 	const { clearInvoice } = getItemAdditionApi();
 	let old_invoice = null;
 	const doc = get_invoice_doc(context);
-
+    // Log these instead
 	try {
 		if (doc.name) {
 			old_invoice = await context.update_invoice(doc);

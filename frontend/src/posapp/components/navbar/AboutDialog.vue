@@ -203,7 +203,7 @@ function loadAppInfo() {
 	left: 0;
 	right: 0;
 	height: 3px;
-	background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(90deg, #d32f2f 0%, #ff5252 100%);
 }
 
 .header-content-improved {
@@ -215,13 +215,13 @@ function loadAppInfo() {
 }
 
 .header-icon-wrapper-improved {
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
 	border-radius: 14px;
 	padding: 10px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);
+	box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3);
 }
 
 .header-icon {
@@ -327,7 +327,7 @@ function loadAppInfo() {
 }
 
 .app-icon-improved {
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
 	border-radius: 8px;
 	padding: 8px;
 	display: flex;

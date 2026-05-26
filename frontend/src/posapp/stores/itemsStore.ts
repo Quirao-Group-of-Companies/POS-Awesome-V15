@@ -343,6 +343,16 @@ export const useItemsStore = defineStore("items", () => {
 	});
 
 	// Actions
+	/** Keep item search/cart validation in sync when POS Profile is refreshed (e.g. zero-stock flag). */
+	const syncPosProfile = (profile: POSProfile | null | undefined) => {
+		if (!profile) {
+			return;
+		}
+		posProfile.value = posProfile.value
+			? ({ ...posProfile.value, ...profile } as POSProfile)
+			: profile;
+	};
+
 	const initialize = async (
 		profile: POSProfile,
 		cust: string | null = null,
@@ -922,6 +932,7 @@ export const useItemsStore = defineStore("items", () => {
 				await loadItems({
 					forceServer: true,
 					priceList: newPriceList,
+					limit: resolvePageSize(),
 				});
 			}
 		} catch (error) {
@@ -1161,6 +1172,7 @@ export const useItemsStore = defineStore("items", () => {
 		cacheStats,
 
 		// Actions
+		syncPosProfile,
 		initialize,
 		loadItems,
 		loadItemGroups,

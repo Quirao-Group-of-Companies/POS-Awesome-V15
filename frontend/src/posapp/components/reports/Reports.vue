@@ -4786,7 +4786,7 @@ onMounted(() => {
 <style scoped>
 .awesome-dashboard-view {
 	--dashboard-bg-base: var(--pos-surface-muted, var(--pos-surface, #f4f6f8));
-	--dashboard-glow-primary: rgba(25, 118, 210, 0.08);
+	--dashboard-glow-primary: rgba(211, 47, 47, 0.08);
 	--dashboard-glow-secondary: rgba(76, 175, 80, 0.08);
 	--dashboard-tabs-bg: var(--pos-surface-raised, var(--pos-card-bg, #ffffff));
 	--dashboard-tab-active-bg: var(--pos-card-bg, #ffffff);
@@ -4801,7 +4801,7 @@ onMounted(() => {
 
 :deep(.v-theme--dark) .awesome-dashboard-view {
 	--dashboard-bg-base: var(--pos-surface-muted, #1a2028);
-	--dashboard-glow-primary: rgba(66, 165, 245, 0.18);
+	--dashboard-glow-primary: rgba(255, 82, 82, 0.18);
 	--dashboard-glow-secondary: rgba(102, 187, 106, 0.14);
 	--dashboard-tabs-bg: rgba(255, 255, 255, 0.04);
 	--dashboard-tab-active-bg: rgba(255, 255, 255, 0.08);
@@ -4934,7 +4934,7 @@ onMounted(() => {
 }
 
 .metric-card--sales {
-	box-shadow: 0 8px 20px rgba(25, 118, 210, 0.08);
+	box-shadow: 0 8px 20px rgba(211, 47, 47, 0.08);
 }
 
 .metric-card--profit {

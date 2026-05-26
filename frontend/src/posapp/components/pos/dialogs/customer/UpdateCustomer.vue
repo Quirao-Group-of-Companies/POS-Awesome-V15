@@ -251,7 +251,7 @@ export default {
 		mobile_no: "",
 		address_line1: "",
 		city: "",
-		country: "Pakistan",
+		country: "Philippines",
 		email_id: "",
 		referral_code: "",
 		birthday: "",
@@ -442,8 +442,8 @@ export default {
 			this.email_id = "";
 			this.referral_code = "";
 			this.birthday = "";
-			this.group = frappe.defaults.get_user_default("Customer Group");
-			this.territory = frappe.defaults.get_user_default("Territory");
+			this.group = frappe.defaults.get_user_default("Customer Group") || "Individual";
+			this.territory = frappe.defaults.get_user_default("Territory") || "Philippines";
 			this.customer_id = "";
 			this.customer_type = "Individual";
 			this.gender = "";

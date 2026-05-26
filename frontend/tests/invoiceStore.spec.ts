@@ -58,6 +58,16 @@ describe("invoiceStore invoice type state", () => {
 		expect(store.selectedDeliveryCharge).toBe("");
 	});
 
+	it("clears service charge when the invoice is cleared", () => {
+		const store = useInvoiceStore();
+
+		store.setServiceCharge(125);
+
+		store.clear();
+
+		expect(store.serviceCharge).toBe(0);
+	});
+
 	it("resets invoice type when clearing without preserved stickies", () => {
 		const store = useInvoiceStore();
 
@@ -77,6 +87,18 @@ describe("invoiceStore invoice type state", () => {
 		store.clear({ preserveStickies: true });
 
 		expect(store.invoiceType).toBe("Quotation");
+		expect(store.deferStockValidationToPayment).toBe(true);
+	});
+
+	it("defers stock validation for restaurant table orders", () => {
+		const store = useInvoiceStore();
+
+		store.mergeInvoiceDoc({
+			restaurant_table: "Table 1",
+			restaurant_table_label: "Table 1",
+		} as any);
+
+		expect(store.isRestaurantTableOrder).toBe(true);
 		expect(store.deferStockValidationToPayment).toBe(true);
 	});
 
@@ -121,5 +143,55 @@ describe("invoiceStore invoice type state", () => {
 
 		expect(store.flowToLoad).toBeNull();
 		expect(store.flowContext).toBeNull();
+	});
+
+	it("updates cart totals incrementally for rapid row mutations", () => {
+		const store = useInvoiceStore();
+		const first = store.addItem({
+			posa_row_id: "row-1",
+			item_code: "ITEM-1",
+			qty: 2,
+			rate: 10,
+			discount_amount: 1,
+		});
+
+		expect(first?.qty).toBe(2);
+		expect(store.totalQty).toBe(2);
+		expect(store.grossTotal).toBe(20);
+		expect(store.discountTotal).toBe(2);
+
+		store.updateItemWithTotals("row-1", (item) => {
+			item.qty += 3;
+		});
+
+		expect(store.totalQty).toBe(5);
+		expect(store.grossTotal).toBe(50);
+		expect(store.discountTotal).toBe(5);
+
+		store.addItems([
+			{
+				posa_row_id: "row-2",
+				item_code: "ITEM-2",
+				qty: 4,
+				rate: 7,
+				discount_amount: 0.5,
+			},
+			{
+				posa_row_id: "row-3",
+				item_code: "ITEM-3",
+				qty: 1,
+				rate: 12,
+			},
+		]);
+
+		expect(store.totalQty).toBe(10);
+		expect(store.grossTotal).toBe(90);
+		expect(store.discountTotal).toBe(7);
+
+		store.removeItemByRowId("row-1");
+
+		expect(store.totalQty).toBe(5);
+		expect(store.grossTotal).toBe(40);
+		expect(store.discountTotal).toBe(2);
 	});
 });

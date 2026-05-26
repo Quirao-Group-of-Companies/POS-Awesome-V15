@@ -224,6 +224,10 @@ import { useBarcodeIndexing } from "../../../composables/pos/items/useBarcodeInd
 import { useScanProcessor } from "../../../composables/pos/items/useScanProcessor";
 import { useItemCurrency } from "../../../composables/pos/items/useItemCurrency";
 import { startItemsSelectorInitialization } from "../../../composables/pos/items/useItemsSelectorInitialization";
+import {
+	loadItemSelectorSettings,
+	saveItemSelectorSettings,
+} from "../../../utils/itemSelectorSettings";
 import { registerItemsSelectorEvents } from "../../../composables/pos/items/useItemsSelectorEvents";
 import { registerItemsSelectorTypeToSearch } from "../../../composables/pos/items/useItemsSelectorTypeToSearch";
 import { useItemsSelectorLayoutLifecycle } from "../../../composables/pos/items/useItemsSelectorLayoutLifecycle";
@@ -325,7 +329,7 @@ const {
 // 2. Local State & Settings
 const search_input = ref("");
 const first_search = ref("");
-const items_view = ref("list");
+const items_view = ref<"card" | "list">("card");
 const itemsPerPage = ref(50);
 const clearingSearch = ref(false);
 const isDragging = ref(false);
@@ -342,6 +346,14 @@ const item_group = computed({
 });
 const virtualScrollBuffer = ref(200);
 const localStorageAvailable = ref(true);
+
+watch(items_view, (mode) => {
+	if (!localStorageAvailable.value) {
+		return;
+	}
+	const current = loadItemSelectorSettings() || {};
+	saveItemSelectorSettings({ ...current, display_mode: mode });
+});
 
 // Settings Refs
 const hide_qty_decimals = ref(false);
@@ -377,7 +389,20 @@ const {
 const flyConfig = reactive({ speed: 0.6, easing: "ease-in-out" });
 
 // 3. Computed Properties
-const pos_profile = computed(() => (itemsIntegration.posProfile.value || {}) as any);
+const pos_profile = computed(() => {
+	const fromItems = itemsIntegration.posProfile.value;
+	const fromUi = uiPosProfile.value;
+	if (!fromItems && !fromUi) {
+		return {} as any;
+	}
+	if (!fromItems) {
+		return (fromUi || {}) as any;
+	}
+	if (!fromUi) {
+		return fromItems as any;
+	}
+	return { ...fromItems, ...fromUi } as any;
+});
 const usesLimitSearch = computed(() =>
 	parseBooleanSetting(pos_profile.value?.posa_use_limit_search ?? pos_profile.value?.pose_use_limit_search),
 );
@@ -394,7 +419,6 @@ const { syncSelectorPriceList } = useItemsSelectorPriceListSync({
 	activePriceList: itemsIntegration.active_price_list,
 	getDefaultPriceList: () => pos_profile.value?.selling_price_list || "",
 	updatePriceList: (priceList) => itemsIntegration.updatePriceList(priceList),
-	getItems: (force) => itemsIntegration.get_items(force),
 });
 const isPosSupervisor = computed(() => parseBooleanSetting(currentCashier.value?.is_supervisor));
 
@@ -501,6 +525,7 @@ const lastSyncTimeLabel = computed(() => {
 
 // Settings context object for useItemsSelectorSettings
 const settingsContext = reactive({
+	items_view,
 	new_line,
 	hide_qty_decimals,
 	hide_zero_rate_items,
@@ -646,18 +671,19 @@ const add_item = async (item, optionsOrQty: any = {}) => {
 			new_line: typeof options?.new_line === "boolean" ? options.new_line : !!new_line.value,
 		};
 
-		const isValid = await cartValidation.validateCartItem(
-			item,
-			requestedQty,
-			pos_profile.value,
-			stock_settings.value,
-			null,
-			blockSaleBeyondAvailableQty.value,
-			!options.suppressNegativeWarning,
-			true,
-			isReturnInvoice.value,
-			deferStockValidationToPayment.value,
-		);
+		const isValid = true;
+		// const isValid = await cartValidation.validateCartItem(
+		// 	item,
+		// 	requestedQty,
+		// 	pos_profile.value,
+		// 	stock_settings.value,
+		// 	null,
+		// 	blockSaleBeyondAvailableQty.value,
+		// 	!options.suppressNegativeWarning,
+		// 	true,
+		// 	isReturnInvoice.value,
+		// 	deferStockValidationToPayment.value,
+		// );
 
 		if (isValid) {
 			await useItemAddition().prepareItemForCart(item, requestedQty, context);

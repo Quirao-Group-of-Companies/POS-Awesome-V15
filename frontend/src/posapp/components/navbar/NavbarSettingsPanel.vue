@@ -346,7 +346,7 @@ function handleEmbeddedActionSaved() {
 	justify-content: space-between;
 	gap: 14px;
 	border-bottom: 1px solid var(--pos-border);
-	background: linear-gradient(135deg, rgba(25, 118, 210, 0.06), rgba(66, 165, 245, 0.12));
+	background: linear-gradient(135deg, rgba(211, 47, 47, 0.06), rgba(255, 82, 82, 0.12));
 }
 
 .navbar-settings-panel__close {
@@ -408,7 +408,7 @@ function handleEmbeddedActionSaved() {
 	padding: 18px;
 	border-right: 1px solid var(--pos-border);
 	background:
-		linear-gradient(180deg, rgba(25, 118, 210, 0.06), rgba(25, 118, 210, 0.02)), var(--pos-card-bg);
+		linear-gradient(180deg, rgba(211, 47, 47, 0.06), rgba(211, 47, 47, 0.02)), var(--pos-card-bg);
 	display: grid;
 	align-content: start;
 	gap: 14px;
@@ -450,8 +450,8 @@ function handleEmbeddedActionSaved() {
 }
 
 .navbar-settings-panel__category--active {
-	background: linear-gradient(135deg, rgba(25, 118, 210, 0.12), rgba(66, 165, 245, 0.08));
-	border-color: rgba(25, 118, 210, 0.32);
+	background: linear-gradient(135deg, rgba(211, 47, 47, 0.12), rgba(255, 82, 82, 0.08));
+	border-color: rgba(211, 47, 47, 0.32);
 }
 
 .navbar-settings-panel__category-icon,
@@ -496,7 +496,7 @@ function handleEmbeddedActionSaved() {
 	padding: 18px;
 	border-radius: 22px;
 	border: 1px solid var(--pos-border);
-	background: linear-gradient(135deg, rgba(25, 118, 210, 0.08), rgba(66, 165, 245, 0.04));
+	background: linear-gradient(135deg, rgba(211, 47, 47, 0.08), rgba(255, 82, 82, 0.04));
 }
 
 .navbar-settings-panel__detail-copy {
@@ -507,7 +507,7 @@ function handleEmbeddedActionSaved() {
 .navbar-settings-panel__detail-chip {
 	padding: 8px 10px;
 	border-radius: 999px;
-	background: rgba(25, 118, 210, 0.12);
+	background: rgba(211, 47, 47, 0.12);
 	white-space: nowrap;
 }
 
@@ -545,7 +545,7 @@ function handleEmbeddedActionSaved() {
 	gap: 8px;
 	width: fit-content;
 	border: 1px solid var(--pos-border);
-	background: rgba(25, 118, 210, 0.06);
+	background: rgba(211, 47, 47, 0.06);
 	color: var(--pos-text-primary);
 	border-radius: 999px;
 	padding: 8px 12px;
@@ -559,7 +559,7 @@ function handleEmbeddedActionSaved() {
 	padding: 18px;
 	display: grid;
 	gap: 8px;
-	background: rgba(25, 118, 210, 0.04);
+	background: rgba(211, 47, 47, 0.04);
 }
 
 .navbar-settings-panel__embedded-title {
@@ -619,12 +619,12 @@ function handleEmbeddedActionSaved() {
 }
 
 .navbar-settings-panel__action--primary .navbar-settings-panel__action-icon {
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
 }
 
 .navbar-settings-panel__category-icon--primary,
 .navbar-settings-panel__detail-icon--primary {
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
 }
 
 .navbar-settings-panel__action--secondary .navbar-settings-panel__action-icon {

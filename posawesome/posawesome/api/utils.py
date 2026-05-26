@@ -117,7 +117,11 @@ def get_active_pos_profile(user=None):
         profile = frappe.db.get_single_value("POS Settings", "pos_profile")
     if not profile:
         return None
-    return frappe.get_doc("POS Profile", profile).as_dict()
+    doc = frappe.get_doc("POS Profile", profile)
+    data = doc.as_dict()
+    # Not a DocType field; used by Paluto-style UI (e.g. table grid by role).
+    data["posa_user_roles"] = frappe.get_roles(user)
+    return data
 
 
 @frappe.whitelist()

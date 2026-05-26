@@ -20,40 +20,104 @@
 				:class="['pos-text-primary nav-icon', isRtl ? 'rtl-nav-icon' : 'ltr-nav-icon']"
 			/>
 
-			<v-img
-				:src="posLogo"
-				alt="POS Awesome"
-				:max-width="isMobile ? 24 : 32"
-				:class="['pos-navbar-logo', isRtl ? 'rtl-logo' : 'ltr-logo']"
-				loading="lazy"
-			/>
-
-			<v-toolbar-title
-				@click="$emit('go-desk')"
-				@keydown.enter="$emit('go-desk')"
+			<div
 				:class="[
-					'text-h6 font-weight-bold text-primary pos-navbar-title',
-					isRtl ? 'rtl-title' : 'ltr-title',
+					'pos-navbar-brand-cluster',
+					isRtl ? 'rtl-brand-cluster' : 'ltr-brand-cluster',
 				]"
-				style="cursor: pointer; text-decoration: none"
-				tabindex="0"
-				:aria-label="__('Go to Frappe Desk')"
-				role="button"
 			>
-				<template v-if="isMobile">
-					<span class="pos-navbar-title-compact">{{ __("POS") }}</span>
-				</template>
-				<template v-else>
-					<span class="font-weight-light pos-navbar-title-light">{{ __("POS") }}</span
-					><span class="pos-navbar-title-bold">{{ __("Awesome") }}</span>
-				</template>
-			</v-toolbar-title>
+				<div
+					:class="[
+						'pos-navbar-logo-wrap',
+						isMobile ? 'pos-navbar-logo-wrap--mobile' : 'pos-navbar-logo-wrap--desktop',
+					]"
+				>
+					<v-img
+						:src="displayLogo"
+						:alt="navbarBrand.alt"
+						class="pos-navbar-logo"
+						contain
+						loading="lazy"
+					/>
+				</div>
+
+				<v-toolbar-title
+					@click="$emit('go-desk')"
+					@keydown.enter="$emit('go-desk')"
+					:class="[
+						'text-h6 font-weight-bold text-primary pos-navbar-title',
+						isRtl ? 'rtl-title' : 'ltr-title',
+						isPalutoMode ? 'pos-navbar-title--paluto' : '',
+					]"
+					style="cursor: pointer; text-decoration: none"
+					tabindex="0"
+					:aria-label="__('Go to Frappe Desk')"
+					role="button"
+				>
+					<template v-if="isMobile">
+						<span class="pos-navbar-title-compact">{{ navbarBrand.compact }}</span>
+					</template>
+					<template v-else>
+						<span class="font-weight-light pos-navbar-title-light">{{ navbarBrand.light }}</span
+						><span class="pos-navbar-title-bold">{{ navbarBrand.bold }}</span>
+					</template>
+				</v-toolbar-title>
+			</div>
+		</div>
+
+		<div
+			v-if="tableContext"
+			:class="['pos-navbar-table-context', isRtl ? 'rtl-table-context' : 'ltr-table-context']"
+			:aria-label="tableContextAriaLabel"
+		>
+			<template v-if="!isMobile">
+				<div class="pos-navbar-table-context__segment">
+					<span class="pos-navbar-table-context__label">{{ __("Table") }}</span>
+					<strong class="pos-navbar-table-context__value">{{ tableContext.label }}</strong>
+				</div>
+				<span class="pos-navbar-table-context__divider" aria-hidden="true">|</span>
+				<div class="pos-navbar-table-context__segment">
+					<span class="pos-navbar-table-context__label">{{ __("TXN") }}</span>
+					<strong class="pos-navbar-table-context__value">{{ tableContext.txn }}</strong>
+				</div>
+				<span class="pos-navbar-table-context__divider" aria-hidden="true">|</span>
+				<div class="pos-navbar-table-context__segment">
+					<span class="pos-navbar-table-context__label">{{ __("Type") }}</span>
+					<strong class="pos-navbar-table-context__value">{{ tableContext.typeLabel }}</strong>
+				</div>
+			</template>
+			<template v-else>
+				<strong class="pos-navbar-table-context__value">{{ tableContext.label }}</strong>
+				<span class="pos-navbar-table-context__divider" aria-hidden="true">|</span>
+				<span class="pos-navbar-table-context__value pos-navbar-table-context__value--muted">{{
+					tableContext.txn
+				}}</span>
+			</template>
 		</div>
 
 		<v-spacer />
 
 		<!-- Actions Section (right in LTR, left in RTL) -->
 		<div :class="['pos-navbar-actions-section', isRtl ? 'rtl-actions-section' : 'ltr-actions-section']">
+			<v-btn
+				v-if="showBackToTables"
+				variant="flat"
+				color="primary"
+				:size="isMobile ? 'small' : 'default'"
+				:class="[
+					'pos-back-to-tables-btn',
+					isRtl ? 'rtl-back-to-tables-btn' : 'ltr-back-to-tables-btn',
+				]"
+				:prepend-icon="isRtl ? undefined : 'mdi-arrow-left'"
+				:append-icon="isRtl ? 'mdi-arrow-right' : undefined"
+				:aria-label="__('Back to restaurant tables')"
+				@click="goBackToTables"
+			>
+				<span class="pos-back-to-tables-btn__label">
+					{{ isMobile ? __("Tables") : __("Back to Tables") }}
+				</span>
+			</v-btn>
+
 			<!-- Mobile: Show only essential items, others in menu -->
 			<template v-if="isMobile">
 				<!-- Always visible status indicator -->
@@ -230,22 +294,113 @@
 </template>
 
 <script>
+import { computed } from "vue";
+import { storeToRefs } from "pinia";
+import { useRoute, useRouter } from "vue-router";
 import { useRtl } from "../../composables/core/useRtl";
+import { useInvoiceStore } from "../../stores/invoiceStore";
 import posLogo from "../pos/pos.png";
 import NavbarInfoGadgets from "./NavbarInfoGadgets.vue";
+import {
+	getNavbarBrandParts,
+	isPalutoMode as checkPalutoMode,
+} from "../../utils/palutoBrand";
+import { resolvePosNavbarLogo } from "../../utils/posNavbarLogo";
 
 export default {
 	name: "NavbarAppBar",
 	components: {
 		NavbarInfoGadgets,
 	},
-	setup() {
+	setup(props) {
 		const { isRtl, rtlStyles, rtlClasses } = useRtl();
+		const router = useRouter();
+		const route = useRoute();
+		const invoiceStore = useInvoiceStore();
+		const { isRestaurantTableOrder, invoiceDoc, invoiceType } = storeToRefs(invoiceStore);
+		const translate =
+			typeof window !== "undefined" && typeof window.__ === "function"
+				? window.__
+				: (text) => text;
+
+		const formatTableTypeLabel = (type) => {
+			if (type === "Order") {
+				return translate("Order");
+			}
+			if (type === "Quotation") {
+				return translate("Quotation");
+			}
+			if (type === "Invoice") {
+				return translate("Invoice");
+			}
+			return type || translate("Order");
+		};
+
+		const tableContext = computed(() => {
+			if (route.path !== "/pos") {
+				return null;
+			}
+
+			const doc = invoiceDoc.value;
+			const label = String(
+				doc?.restaurant_table_label ||
+					route.query.table_label ||
+					doc?.restaurant_table ||
+					route.query.table_id ||
+					"",
+			).trim();
+
+			if (!label) {
+				return null;
+			}
+
+			const txn = String(doc?.name || "").trim() || translate("New");
+			const typeLabel = formatTableTypeLabel(invoiceType.value);
+
+			return {
+				label,
+				txn,
+				typeLabel,
+			};
+		});
+
+		const tableContextAriaLabel = computed(() => {
+			if (!tableContext.value) {
+				return "";
+			}
+			return translate("Table {0}, transaction {1}, type {2}", [
+				tableContext.value.label,
+				tableContext.value.txn,
+				tableContext.value.typeLabel,
+			]);
+		});
+
+		const showBackToTables = computed(() => {
+			if (route.path !== "/pos") {
+				return false;
+			}
+			if (checkPalutoMode(props.posProfile)) {
+				return true;
+			}
+			return (
+				isRestaurantTableOrder.value ||
+				(typeof route.query.table_id === "string" && route.query.table_id.length > 0)
+			);
+		});
+
+		const goBackToTables = () => {
+			router.push({ path: "/tables" });
+		};
+
 		return {
 			isRtl,
 			rtlStyles,
 			rtlClasses,
-			posLogo,
+			posLogoFallback: posLogo,
+			showBackToTables,
+			goBackToTables,
+			tableContext,
+			tableContextAriaLabel,
 		};
 	},
 	data() {
@@ -298,8 +453,24 @@ export default {
 			type: String,
 			default: "",
 		},
+		logoSrc: {
+			type: String,
+			default: "",
+		},
 	},
 	computed: {
+		displayLogo() {
+			return resolvePosNavbarLogo(this.logoSrc) || this.posLogoFallback;
+		},
+
+		isPalutoMode() {
+			return checkPalutoMode(this.posProfile);
+		},
+
+		navbarBrand() {
+			return getNavbarBrandParts(this.isPalutoMode);
+		},
+
 		appBarColor() {
 			return this.$theme.isDark ? this.$vuetify.theme.themes.dark.colors.surface : "white";
 		},
@@ -418,12 +589,28 @@ export default {
 .pos-navbar-brand-section {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 10px;
 	flex-direction: row;
-	/* Default to normal row */
-	flex: 1 1 auto;
+	flex: 0 1 auto;
 	min-width: 0;
 	max-width: 100%;
+}
+
+/* Logo + title stay grouped; no stretched slot between them */
+.pos-navbar-brand-cluster {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	flex: 0 1 auto;
+	min-width: 0;
+}
+
+.ltr-brand-cluster {
+	flex-direction: row;
+}
+
+.rtl-brand-cluster {
+	flex-direction: row-reverse;
 }
 
 .pos-navbar-title-compact {
@@ -528,24 +715,125 @@ export default {
 	box-shadow: 0 4px 20px var(--pos-shadow) !important;
 }
 
-/* Logo Styling */
+/* Active table context — centered between brand and actions */
+.pos-navbar-table-context {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 1 1 auto;
+	gap: 10px;
+	min-width: 0;
+	padding: 0 8px;
+	color: var(--pos-text-secondary);
+	white-space: nowrap;
+}
+
+.pos-navbar-table-context__segment {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	min-width: 0;
+}
+
+.pos-navbar-table-context__label {
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--pos-text-secondary);
+}
+
+.pos-navbar-table-context__value {
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.96);
+	line-height: 1.2;
+}
+
+.pos-navbar-table-context__divider {
+	color: var(--pos-border);
+	font-weight: 300;
+	user-select: none;
+}
+
+.pos-back-to-tables-btn {
+	flex-shrink: 0;
+	text-transform: none;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	border-radius: var(--pos-radius-sm, 10px) !important;
+}
+
+.pos-back-to-tables-btn__label {
+	white-space: nowrap;
+}
+
+.pos-navbar-table-context__value--muted {
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: rgba(255, 255, 255, 0.88);
+}
+
+@media (max-width: 768px) {
+	.pos-back-to-tables-btn {
+		padding-inline: 10px !important;
+		min-width: 0;
+	}
+
+	.pos-navbar-table-context {
+		gap: 6px;
+		padding: 0 4px;
+		flex: 0 1 auto;
+	}
+
+	.pos-navbar-table-context__value {
+		font-size: 0.82rem;
+	}
+}
+
+/* Logo — height-based sizing so wide marks stay crisp in the app bar */
+.pos-navbar-logo-wrap {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.pos-navbar-logo-wrap--desktop {
+	height: 42px;
+	width: 42px;
+	max-width: 96px;
+}
+
+.pos-navbar-logo-wrap--mobile {
+	height: 38px;
+	width: 38px;
+	max-width: 80px;
+}
+
 .pos-navbar-logo {
-	transition: transform 0.3s ease;
+	height: 100%;
+	width: 100%;
+	transition: transform 0.2s ease;
 }
 
-.rtl-logo {
-	margin-left: 12px;
-	margin-right: 0;
+.pos-navbar-logo :deep(.v-img__img),
+.pos-navbar-logo :deep(img) {
+	object-fit: contain;
+	object-position: center;
 }
 
-.ltr-logo {
-	margin-right: 12px;
-	margin-left: 0;
-	order: 0;
+.pos-navbar-brand-cluster :deep(.v-toolbar-title) {
+	flex: 0 0 auto !important;
+	width: auto !important;
+	min-width: 0;
+	padding-inline: 0 !important;
+	justify-content: flex-start !important;
 }
 
-.pos-navbar-logo:hover {
-	transform: scale(1.05);
+.pos-navbar-logo-wrap:hover .pos-navbar-logo {
+	transform: scale(1.03);
 }
 
 @media (max-width: 960px) {
@@ -593,9 +881,14 @@ export default {
 	align-items: center;
 	min-width: 0;
 	max-width: 100%;
-	flex: 1 1 auto;
-	/* Use same blue as Menu button - matching gradient blue */
-	color: #1976d2 !important;
+	flex: 0 0 auto;
+	width: auto;
+	/* Brand accent follows theme / Paluto profile */
+	color: var(--pos-primary) !important;
+}
+
+.pos-navbar-title--paluto .pos-navbar-title-bold {
+	color: var(--pos-primary-variant) !important;
 }
 
 .pos-navbar-title:hover {
@@ -655,18 +948,18 @@ export default {
 	transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	min-width: 40px;
 	min-height: 40px;
-	color: #1976d2 !important;
-	background: rgba(25, 118, 210, 0.08) !important;
-	border: 1px solid rgba(25, 118, 210, 0.12);
+	color: var(--pos-primary) !important;
+	background: color-mix(in srgb, var(--pos-primary) 8%, transparent) !important;
+	border: 1px solid color-mix(in srgb, var(--pos-primary) 12%, transparent);
 	backdrop-filter: blur(8px);
 }
 
 .nav-icon:hover {
-	background: rgba(25, 118, 210, 0.12) !important;
-	color: #1565c0 !important;
-	border-color: rgba(25, 118, 210, 0.2);
+	background: color-mix(in srgb, var(--pos-primary) 12%, transparent) !important;
+	color: var(--pos-primary-variant) !important;
+	border-color: color-mix(in srgb, var(--pos-primary) 20%, transparent);
 	transform: translateY(-1px);
-	box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+	box-shadow: 0 4px 12px color-mix(in srgb, var(--pos-primary) 15%, transparent);
 }
 
 .rtl-nav-icon {
@@ -699,9 +992,9 @@ export default {
 }
 
 .profile-chip {
-	color: #1976d2 !important;
-	border-color: rgba(25, 118, 210, 0.2) !important;
-	background: rgba(25, 118, 210, 0.06) !important;
+	color: var(--pos-primary) !important;
+	border-color: color-mix(in srgb, var(--pos-primary) 20%, transparent) !important;
+	background: color-mix(in srgb, var(--pos-primary) 6%, transparent) !important;
 	backdrop-filter: blur(8px);
 }
 
@@ -744,9 +1037,9 @@ export default {
 
 .profile-chip:hover {
 	transform: translateY(-1px);
-	background: rgba(25, 118, 210, 0.1) !important;
-	border-color: rgba(25, 118, 210, 0.25) !important;
-	box-shadow: 0 4px 12px rgba(25, 118, 210, 0.12);
+	background: color-mix(in srgb, var(--pos-primary) 10%, transparent) !important;
+	border-color: color-mix(in srgb, var(--pos-primary) 25%, transparent) !important;
+	box-shadow: 0 4px 12px color-mix(in srgb, var(--pos-primary) 12%, transparent);
 }
 
 /* RTL Profile Chip Styling */
@@ -817,26 +1110,26 @@ export default {
 	padding: 4px;
 	min-width: 40px;
 	min-height: 40px;
-	background: rgba(25, 118, 210, 0.08) !important;
-	border: 1px solid rgba(25, 118, 210, 0.12);
+	background: color-mix(in srgb, var(--pos-primary) 8%, transparent) !important;
+	border: 1px solid color-mix(in srgb, var(--pos-primary) 12%, transparent);
 	border-radius: 12px;
 	backdrop-filter: blur(8px);
 }
 
 .offline-invoices-btn .pos-text-primary {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 }
 
-/* Elite styling for navbar text and icons */
+/* Navbar text and icons follow theme primary */
 .pos-navbar-enhanced .pos-text-primary {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 }
 
-/* Ensure profile text and icons use elite colors */
+/* Ensure profile text and icons use theme colors */
 .profile-chip .pos-text-primary,
 .profile-chip .ltr-profile-text,
 .profile-chip .rtl-profile-text {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 	font-weight: 500;
 }
 
@@ -844,12 +1137,12 @@ export default {
 .pos-navbar-enhanced .v-icon.pos-text-primary,
 .pos-navbar-enhanced .mdi-menu-down,
 .pos-navbar-enhanced .v-icon--end.pos-text-primary {
-	color: #1976d2 !important;
+	color: var(--pos-primary) !important;
 	transition: color 0.25s ease;
 }
 
 .pos-navbar-enhanced .v-icon.pos-text-primary:hover {
-	color: #1565c0 !important;
+	color: var(--pos-primary-variant) !important;
 }
 
 .rtl-offline-btn {
@@ -864,13 +1157,13 @@ export default {
 
 .offline-invoices-btn:hover {
 	transform: translateY(-1px);
-	background: rgba(25, 118, 210, 0.12) !important;
-	border-color: rgba(25, 118, 210, 0.2);
-	box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+	background: color-mix(in srgb, var(--pos-primary) 12%, transparent) !important;
+	border-color: color-mix(in srgb, var(--pos-primary) 20%, transparent);
+	box-shadow: 0 4px 12px color-mix(in srgb, var(--pos-primary) 15%, transparent);
 }
 
 .offline-invoices-btn:hover .pos-text-primary {
-	color: #1565c0 !important;
+	color: var(--pos-primary-variant) !important;
 }
 
 .offline-invoices-btn.has-pending {
@@ -1000,8 +1293,9 @@ export default {
 	flex-shrink: 0;
 }
 
-.mobile-navbar .pos-navbar-logo {
-	max-width: 28px !important;
+.mobile-navbar .pos-navbar-logo-wrap--mobile {
+	height: 38px;
+	width: 38px;
 }
 
 .mobile-navbar .pos-navbar-title {
@@ -1045,8 +1339,9 @@ export default {
 		gap: 6px;
 	}
 
-	.mobile-navbar .pos-navbar-logo {
-		max-width: 24px !important;
+	.mobile-navbar .pos-navbar-logo-wrap--mobile {
+		height: 34px;
+		width: 34px;
 	}
 
 	.mobile-navbar .pos-navbar-title {
@@ -1077,7 +1372,7 @@ export default {
 	.mobile-btn {
 		min-width: 44px !important;
 		min-height: 44px !important;
-		-webkit-tap-highlight-color: rgba(25, 118, 210, 0.1);
+		-webkit-tap-highlight-color: color-mix(in srgb, var(--pos-primary) 10%, transparent);
 	}
 
 	.pos-navbar-title {
@@ -1093,7 +1388,7 @@ export default {
 	.nav-icon,
 	.offline-invoices-btn,
 	.profile-chip,
-	.pos-navbar-logo,
+	.pos-navbar-logo-wrap,
 	.gadget-wrapper {
 		transition: none !important;
 		animation: none !important;
@@ -1137,8 +1432,7 @@ export default {
 
 /* High DPI display adjustments */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-	.mobile-navbar .pos-navbar-logo,
-	.mobile-navbar .v-icon {
+	.pos-navbar-logo :deep(img) {
 		image-rendering: -webkit-optimize-contrast;
 		image-rendering: crisp-edges;
 	}
@@ -1148,6 +1442,11 @@ export default {
 @media (max-height: 500px) and (orientation: landscape) {
 	.mobile-navbar {
 		height: 48px !important;
+	}
+
+	.mobile-navbar .pos-navbar-logo-wrap--mobile {
+		height: 32px;
+		width: 32px;
 	}
 
 	.mobile-navbar .pos-navbar-title {

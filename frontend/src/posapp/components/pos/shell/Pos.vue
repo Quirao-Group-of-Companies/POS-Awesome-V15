@@ -216,6 +216,7 @@ import Variants from "../items/Variants.vue";
 import Returns from "../flows/Returns.vue";
 import MpesaPayments from "../payments/Mpesa-Payments.vue";
 import { inject, ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { usePosShift } from "../../../composables/pos/shared/usePosShift";
 import { useOffers } from "../../../composables/pos/shared/useOffers";
 // Import the cache cleanup function
@@ -227,6 +228,11 @@ import { useInvoiceStore } from "../../../stores/invoiceStore.js";
 import { useItemsStore } from "../../../stores/itemsStore.js";
 import { storeToRefs } from "pinia";
 import { useCustomerDisplayPublisher } from "../../../composables/pos/shared/useCustomerDisplayPublisher";
+import { ensurePosProfile } from "../../../../utils/pos_profile";
+import {
+	resumeRestaurantTableOrder,
+	startNewRestaurantTableSession,
+} from "../../../utils/resumeRestaurantTableOrder";
 
 export default {
 	setup() {
@@ -244,7 +250,63 @@ export default {
 		const uiStore = useUIStore();
 		const invoiceStore = useInvoiceStore();
 		const itemsStore = useItemsStore();
+
 		const __ = window.__;
+
+		const applyRestaurantTableFromRoute = async () => {
+			const tableId = route.query.table_id;
+			if (!tableId || typeof tableId !== "string") {
+				return;
+			}
+			const tableLabel = String(route.query.table_label || tableId);
+			const floor = String(route.query.floor || "");
+			const savedFlag = route.query.order_saved;
+			const currentDoc = invoiceStore.invoiceDoc;
+			if (
+				currentDoc?.restaurant_table === tableId &&
+				Array.isArray(invoiceStore.items) &&
+				invoiceStore.items.length > 0
+			) {
+				return;
+			}
+			const profile = posProfile.value || (await ensurePosProfile());
+
+			if (!profile) {
+				startNewRestaurantTableSession(
+					invoiceStore,
+					{ name: tableId, label: tableLabel, floor },
+					savedFlag === "1" || savedFlag === "true",
+				);
+				return;
+			}
+
+			try {
+				const { resumed } = await resumeRestaurantTableOrder({
+					tableId,
+					tableLabel,
+					floor,
+					company: profile.company,
+					posProfile: profile,
+					invoiceStore,
+					uiStore,
+				});
+
+				if (!resumed) {
+					startNewRestaurantTableSession(
+						invoiceStore,
+						{ name: tableId, label: tableLabel, floor },
+						savedFlag === "1" || savedFlag === "true",
+					);
+				}
+			} catch (error) {
+				console.error("Failed to resume restaurant table order from route:", error);
+				startNewRestaurantTableSession(
+					invoiceStore,
+					{ name: tableId, label: tableLabel, floor },
+					savedFlag === "1" || savedFlag === "true",
+				);
+			}
+		};
 		const { activeView, posProfile, paymentDialogOpen } = storeToRefs(uiStore);
 		const {
 			invoiceDoc,
@@ -255,6 +317,8 @@ export default {
 			additionalDiscount,
 			additionalDiscountPercentage,
 		} = storeToRefs(invoiceStore);
+
+		const route = useRoute();
 		const usePaymentDialog = computed(() => responsive.windowWidth.value >= 992);
 		const useCompactPosSwitcher = computed(() => responsive.windowWidth.value < 1100);
 		const compactPanel = ref("selector");
@@ -350,6 +414,7 @@ export default {
 		const additionalDiscountPercentageDisplay = ref(
 			normalizeDiscountDisplay(additionalDiscountPercentage.value),
 		);
+
 
 		watch(
 			() => [
@@ -486,7 +551,15 @@ export default {
 			eventBus,
 		});
 
+		watch(
+			() => route.query.table_id,
+			() => {
+				applyRestaurantTableFromRoute();
+			},
+		);
+
 		onMounted(() => {
+			applyRestaurantTableFromRoute();
 			if (typeof window !== "undefined" && "ResizeObserver" in window) {
 				mobileDockObserver = new ResizeObserver(() => {
 					updateBottomDockHeight();
@@ -645,16 +718,9 @@ export default {
 			this.dialog = true;
 		},
 		get_pos_setting() {
-			frappe.db.get_doc("POS Settings", undefined).then((_doc) => {
-				// Update store directly instead of emitting event
-				// If Payments.vue or others need this, they should watch uiStore.posSettings
-				// For now, we assume uiStore.setStockSettings or similar is sufficient,
-				// or we add a new generic settings store.
-				// However, the original code used eventBus.emit("set_pos_settings", doc);
-				// We'll attach it to uiStore if a suitable method exists, or just log for now as
-				// clean separation implies components fetch what they need or use a centralized config store.
-				// Assuming uiStore handles global config:
-				// this.uiStore.setPosSettings(doc); // We might need to implement this if it doesn't exist
+			frappe.db.get_doc("POS Settings", undefined).then((doc) => {
+				this.uiStore.setPosSettings(doc || {});
+				this.eventBus?.emit?.("set_pos_settings", doc || {});
 			});
 		},
 		// handleAddItem removed as ItemsSelector handles pos addition internally

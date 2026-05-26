@@ -16,9 +16,8 @@
  *
  * ## Totals
  * `totalQty`, `grossTotal`, and `discountTotal` are maintained as separate refs.
- * Operations that add or remove rows call `recalculateTotals()` immediately. Incremental
- * field edits (detected by a deep watcher on `itemsData`) are debounced through
- * `triggerUpdateTotals` (50 ms) to avoid thrashing during rapid user input.
+ * Row inserts/removals and store-mediated item edits update those totals
+ * incrementally. Manual edit paths call the debounced total refresh explicitly.
  *
  * ## Sticky fields
  * Discount and delivery-charge fields that should survive an invoice reset are stored as
@@ -27,7 +26,10 @@
  */
 
 import { defineStore } from "pinia";
-import { computed, ref, reactive, watch } from "vue";
+import { computed, ref, reactive } from "vue";
+import { getRestaurantDefaultCustomer } from "../utils/restaurantCustomer";
+import { useCustomersStore } from "./customersStore";
+import { useUIStore } from "./uiStore";
 
 declare const frappe: any;
 declare const __: any;
@@ -66,6 +68,18 @@ const toNumber = (value: any): number => {
 };
 
 const cloneItem = <T>(item: T): T => ({ ...item });
+
+const getItemTotals = (item: any) => {
+	const qty = toNumber(item?.qty);
+	const rate = toNumber(item?.rate);
+	const disc = toNumber(item?.discount_amount || 0);
+
+	return {
+		qty,
+		gross: qty * rate,
+		discount: Math.abs(qty * disc),
+	};
+};
 
 export const useInvoiceStore = defineStore("invoice", () => {
 	const invoiceDoc = ref<PartialInvoiceDoc | null>(null);
@@ -112,7 +126,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		let tQty = 0;
 		let tGross = 0;
 		let tDisc = 0;
-
+		
 		for (const item of Array.from(itemsData.values())) {
 			const qty = toNumber(item.qty);
 			const rate = toNumber(item.rate);
@@ -128,6 +142,35 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		discountTotal.value = tDisc;
 	};
 
+	const applyTotalsDelta = (
+		deltaQty: number,
+		deltaGross: number,
+		deltaDiscount: number,
+	) => {
+		totalQty.value += deltaQty;
+		grossTotal.value += deltaGross;
+		discountTotal.value += deltaDiscount;
+	};
+
+	const addLineTotals = (item: any, multiplier = 1) => {
+		const totals = getItemTotals(item);
+		applyTotalsDelta(
+			totals.qty * multiplier,
+			totals.gross * multiplier,
+			totals.discount * multiplier,
+		);
+	};
+
+	const applyLineTotalsDiff = (before: any, after: any) => {
+		const oldTotals = getItemTotals(before);
+		const newTotals = getItemTotals(after);
+		applyTotalsDelta(
+			newTotals.qty - oldTotals.qty,
+			newTotals.gross - oldTotals.gross,
+			newTotals.discount - oldTotals.discount,
+		);
+	};
+
 	/**
 	 * Schedules a `recalculateTotals` call 50 ms in the future, coalescing multiple
 	 * calls within the same tick into a single recalculation.
@@ -138,6 +181,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		if (updateTimer) return;
 		updateTimer = setTimeout(() => {
 			recalculateTotals();
+			touch();
 			updateTimer = null;
 		}, 50);
 	};
@@ -175,6 +219,11 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		doc: PartialInvoiceDoc | string | null | undefined,
 	) => {
 		invoiceDoc.value = normalizeDoc(doc);
+		if (doc && typeof doc === "object" && "restaurant_order_saved" in doc) {
+			restaurantOrderSaved.value = Boolean(
+				Number((doc as PartialInvoiceDoc).restaurant_order_saved) === 1,
+			);
+		}
 		touch();
 	};
 
@@ -190,6 +239,11 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			? { ...invoiceDoc.value }
 			: ({} as PartialInvoiceDoc);
 		invoiceDoc.value = Object.assign(current, patch || {});
+		if (patch && "restaurant_order_saved" in patch) {
+			restaurantOrderSaved.value = Boolean(
+				Number((patch as PartialInvoiceDoc).restaurant_order_saved) === 1,
+			);
+		}
 		touch();
 	};
 
@@ -206,6 +260,67 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	const deliveryCharges = ref<DeliveryCharge[]>([]);
 	const deliveryChargesRate = ref(0);
 	const selectedDeliveryCharge = ref("");
+	const serviceCharge = ref(0);
+	const restaurantOrderSaved = ref(false);
+
+	const isRestaurantTableOrder = computed(() => {
+		const table = invoiceDoc.value?.restaurant_table;
+		return typeof table === "string" && table.trim().length > 0;
+	});
+
+	const restaurantSaveOnlyMode = computed(
+		() => isRestaurantTableOrder.value && !restaurantOrderSaved.value,
+	);
+
+	const markRestaurantOrderSaved = () => {
+		restaurantOrderSaved.value = true;
+		mergeInvoiceDoc({ restaurant_order_saved: 1 });
+	};
+
+	const resetRestaurantOrderSaved = () => {
+		restaurantOrderSaved.value = false;
+		if (isRestaurantTableOrder.value) {
+			mergeInvoiceDoc({ restaurant_order_saved: 0 });
+		}
+	};
+
+	const startRestaurantTableSession = (table: {
+		name: string;
+		label?: string;
+		floor?: string;
+	}) => {
+		restaurantOrderSaved.value = false;
+		const patch: PartialInvoiceDoc = {
+			restaurant_table: table.name,
+			restaurant_table_label: table.label || table.name,
+			restaurant_floor: table.floor || "",
+			restaurant_order_saved: 0,
+		};
+		try {
+			const defaultCustomer = getRestaurantDefaultCustomer(
+				useUIStore().posProfile,
+			);
+			if (defaultCustomer) {
+				patch.customer = defaultCustomer;
+				useCustomersStore().setSelectedCustomer(defaultCustomer);
+			}
+		} catch {
+			/* Pinia may not be ready during early boot */
+		}
+		mergeInvoiceDoc(patch);
+		setInvoiceType("Order");
+	};
+
+	const clearRestaurantSession = () => {
+		restaurantOrderSaved.value = false;
+		const current = invoiceDoc.value ? { ...invoiceDoc.value } : {};
+		delete current.restaurant_table;
+		delete current.restaurant_table_label;
+		delete current.restaurant_floor;
+		delete current.restaurant_order_saved;
+		invoiceDoc.value = Object.keys(current).length ? current : null;
+		touch();
+	};
 	/**
 	 * `true` when `invoiceType` is `"Order"` or `"Quotation"`.
 	 *
@@ -216,8 +331,11 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	 * TODO: verify whether `"Quotation"` actually participates in stock-validation deferral
 	 * in the current backend flow, or whether only `"Order"` does.
 	 */
-	const deferStockValidationToPayment = computed(() =>
-		invoiceType.value === "Order" || invoiceType.value === "Quotation",
+	const deferStockValidationToPayment = computed(
+		() =>
+			invoiceType.value === "Order" ||
+			invoiceType.value === "Quotation" ||
+			isRestaurantTableOrder.value,
 	);
 
 	/**
@@ -288,6 +406,16 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		selectedDeliveryCharge.value = "";
 	};
 
+	/** Sets the transaction-level service charge amount. Non-numeric values are coerced to `0`. */
+	const setServiceCharge = (val: any) => {
+		serviceCharge.value = toNumber(val);
+	};
+
+	/** Resets `serviceCharge` to `0`. */
+	const resetServiceCharge = () => {
+		serviceCharge.value = 0;
+	};
+
 	/**
 	 * Replaces all cart items with the supplied list.
 	 *
@@ -353,8 +481,8 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		} else {
 			itemOrder.value.push(rowId);
 		}
+		addLineTotals(cloned);
 		touch();
-		triggerUpdateTotals();
 		// Return the reactive proxy from the map
 		return itemsData.get(rowId);
 	};
@@ -372,13 +500,21 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	const addItems = (items: any[], index = -1) => {
 		if (!Array.isArray(items) || !items.length) return [];
 		const addedIds: string[] = [];
+		let deltaQty = 0;
+		let deltaGross = 0;
+		let deltaDiscount = 0;
 
 		items.forEach((item) => {
 			if (!item) return;
 			const rowId =
 				item.posa_row_id || Math.random().toString(36).substring(2, 20);
 			if (!item.posa_row_id) item.posa_row_id = rowId;
-			itemsData.set(rowId, cloneItem(item));
+			const cloned = cloneItem(item);
+			itemsData.set(rowId, cloned);
+			const totals = getItemTotals(cloned);
+			deltaQty += totals.qty;
+			deltaGross += totals.gross;
+			deltaDiscount += totals.discount;
 			addedIds.push(rowId);
 		});
 
@@ -390,8 +526,8 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			} else {
 				itemOrder.value.push(...addedIds);
 			}
+			applyTotalsDelta(deltaQty, deltaGross, deltaDiscount);
 			touch();
-			recalculateTotals(); // Immediate update for batch addition
 		}
 
 		return addedIds.map((id) => itemsData.get(id));
@@ -418,14 +554,16 @@ export const useInvoiceStore = defineStore("invoice", () => {
 
 		const rowId = item.posa_row_id || oldId;
 		if (!item.posa_row_id) item.posa_row_id = rowId;
+		const previous = oldId ? itemsData.get(oldId) : undefined;
 
 		if (oldId !== rowId) {
 			itemsData.delete(oldId);
 			itemOrder.value[index] = rowId;
 		}
-		itemsData.set(rowId, cloneItem(item));
+		const cloned = cloneItem(item);
+		itemsData.set(rowId, cloned);
+		applyLineTotalsDiff(previous, cloned);
 		touch();
-		triggerUpdateTotals();
 	};
 
 	/**
@@ -450,14 +588,27 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		}
 
 		if (itemsData.has(rowId)) {
-			const existing = itemsData.get(rowId);
-			if (existing) {
+			updateItemWithTotals(rowId, (existing) => {
 				Object.assign(existing, item);
-			}
-			touch();
+			});
 		} else {
 			addItem(item);
 		}
+	};
+
+	const updateItemWithTotals = (
+		rowId: string,
+		updater: (_item: CartItem) => void,
+	) => {
+		if (!rowId || typeof updater !== "function") return;
+		const item = itemsData.get(rowId);
+		if (!item) return;
+
+		const before = cloneItem(item);
+		updater(item);
+		applyLineTotalsDiff(before, item);
+		touch();
+		return item;
 	};
 
 	/**
@@ -474,13 +625,16 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		}
 
 		if (itemsData.has(rowId)) {
+			const existing = itemsData.get(rowId);
 			itemsData.delete(rowId);
 			const idx = itemOrder.value.indexOf(rowId);
 			if (idx !== -1) {
 				itemOrder.value.splice(idx, 1);
 			}
+			if (existing) {
+				addLineTotals(existing, -1);
+			}
 			touch();
-			recalculateTotals(); // Immediate update on remove
 		}
 	};
 
@@ -530,6 +684,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		invoiceDoc.value = null;
 		flowContext.value = null;
 		flowToLoad.value = null;
+		restaurantOrderSaved.value = false;
 		clearItems();
 		packedItems.value = [];
 
@@ -539,6 +694,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			additionalDiscount.value = 0;
 			additionalDiscountPercentage.value = 0;
 			resetDeliveryCharges();
+			resetServiceCharge();
 		}
 
 		touch();
@@ -577,16 +733,6 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		return map;
 	});
 
-	// Watch deep changes in the map values
-	watch(
-		itemsData,
-		() => {
-			touch();
-			triggerUpdateTotals();
-		},
-		{ deep: true },
-	);
-
 	return {
 		invoiceDoc,
 		invoiceType,
@@ -611,6 +757,8 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		addItems,
 		replaceItemAt,
 		upsertItem,
+		updateItemWithTotals,
+		triggerUpdateTotals,
 		removeItemByRowId,
 		clearItems,
 		setPackedItems,
@@ -653,6 +801,9 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			flowContext.value = flow?.flow_context || null;
 			flowToLoad.value = flow?.prepared_doc || flow;
 		},
+		clearFlowToLoad: () => {
+			flowToLoad.value = null;
+		},
 		// Exposed sticky fields
 		discountAmount,
 		additionalDiscount,
@@ -660,6 +811,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		deliveryCharges,
 		deliveryChargesRate,
 		selectedDeliveryCharge,
+		serviceCharge,
 		// Setters
 		setDiscountAmount,
 		setAdditionalDiscount,
@@ -668,6 +820,15 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		setDeliveryChargesRate,
 		setSelectedDeliveryCharge,
 		resetDeliveryCharges,
+		setServiceCharge,
+		resetServiceCharge,
+		restaurantOrderSaved,
+		isRestaurantTableOrder,
+		restaurantSaveOnlyMode,
+		markRestaurantOrderSaved,
+		resetRestaurantOrderSaved,
+		startRestaurantTableSession,
+		clearRestaurantSession,
 	};
 });
 

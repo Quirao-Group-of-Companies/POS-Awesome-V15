@@ -167,6 +167,7 @@ def _should_block(pos_profile):
 
 
 def _validate_stock_on_invoice(invoice_doc):
+    profile = invoice_doc.get("pos_profile")
     if invoice_doc.doctype == "Sales Invoice" and not cint(getattr(invoice_doc, "update_stock", 0)):
         frappe.logger().debug("Skipping stock validation for Sales Invoice without stock update")
         return

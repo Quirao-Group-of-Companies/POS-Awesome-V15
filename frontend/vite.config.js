@@ -7,7 +7,11 @@ import frappeVueStyle from "../frappe-vue-style";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
-import { buildVersionPayload, getEntryFileName } from "./build-manifest.js";
+import {
+	buildVersionPayload,
+	getEntryFileName,
+	stampBuiltChunkImports,
+} from "./build-manifest.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,13 +23,15 @@ function posawesomeBuildVersionPlugin(version) {
 		name: "posawesome-build-version",
 		apply: "build",
 		async writeBundle(_options, bundle) {
-			const versionFile = path.resolve(__dirname, "../posawesome/public/dist/js/version.json");
+			const distDir = path.resolve(__dirname, "../posawesome/public/dist/js");
+			const versionFile = path.join(distDir, "version.json");
 			await fs.mkdir(path.dirname(versionFile), { recursive: true });
 			await fs.writeFile(
 				versionFile,
 				JSON.stringify(buildVersionPayload(version, bundle), null, 2),
 				"utf8",
 			);
+			await stampBuiltChunkImports(distDir, version);
 		},
 	};
 }

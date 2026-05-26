@@ -136,6 +136,20 @@
 				persistent-placeholder
 			></v-text-field>
 		</v-col>
+		<v-col v-if="invoice_doc" cols="12">
+			<v-text-field
+				density="compact"
+				variant="solo"
+				color="primary"
+				:label="frappe._('Special Discount')"
+				class="sleek-field pos-themed-input"
+				hide-details
+				:model-value="formatCurrency(invoice_doc.custom_special_discount_amount)"
+				readonly
+				:prefix="currencySymbol(invoice_doc.currency)"
+				persistent-placeholder
+			></v-text-field>
+		</v-col>
 		<v-col v-if="invoice_doc && invoice_doc.rounded_total" cols="12" sm="6">
 			<v-text-field
 				density="compact"

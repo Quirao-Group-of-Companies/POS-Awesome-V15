@@ -53,6 +53,7 @@ export const useItemsSelectorSettings = ({
 			background_sync_interval: vm.background_sync_interval,
 			enable_custom_items_per_page: vm.enable_custom_items_per_page,
 			items_per_page: vm.items_per_page,
+			display_mode: (vm.items_view === "list" ? "list" : "card") as "list" | "card",
 		};
 		saveItemSelectorSettings(settings);
 	};
@@ -168,6 +169,9 @@ export const useItemsSelectorSettings = ({
 		if (typeof opts.items_per_page === "number") {
 			vm.items_per_page = opts.items_per_page;
 			vm.itemsPerPage = vm.items_per_page;
+		}
+		if (opts.display_mode === "list" || opts.display_mode === "card") {
+			vm.items_view = opts.display_mode;
 		}
 	};
 

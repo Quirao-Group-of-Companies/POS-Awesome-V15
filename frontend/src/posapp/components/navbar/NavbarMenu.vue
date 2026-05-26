@@ -386,6 +386,16 @@ export default {
 		isDesktop() {
 			return this.windowWidth >= 1024;
 		},
+		showXzReadings() {
+			if (!this.isEnabledSetting(this.posProfile?.posa_paluto_mode)) {
+				return false;
+			}
+			const flag = this.posProfile?.posa_enable_xz_readings;
+			if (flag === undefined || flag === null) {
+				return true;
+			}
+			return this.isEnabledSetting(flag);
+		},
 		panelTitle() {
 			return this.activePanel === "settings" ? __("Settings") : __("Quick Actions");
 		},
@@ -430,6 +440,26 @@ export default {
 					tone: "info",
 					handler: "syncInvoices",
 				},
+				this.showXzReadings
+					? {
+							id: "x-reading",
+							label: __("X Reading"),
+							subtitle: __("Interim shift totals (shift stays open)"),
+							icon: "mdi-file-document-outline",
+							tone: "secondary",
+							handler: "xReading",
+						}
+					: null,
+				this.showXzReadings
+					? {
+							id: "z-reading",
+							label: __("Z Reading"),
+							subtitle: __("End-of-shift report with invoice range"),
+							icon: "mdi-file-document-check-outline",
+							tone: "secondary",
+							handler: "zReading",
+						}
+					: null,
 				!this.posProfile?.posa_hide_closing_shift
 					? {
 							id: "close-shift",
@@ -638,6 +668,14 @@ export default {
 				case "closeShift":
 					this.closeMenu();
 					this.$emit("close-shift");
+					break;
+				case "xReading":
+					this.closeMenu();
+					this.$emit("x-reading");
+					break;
+				case "zReading":
+					this.closeMenu();
+					this.$emit("z-reading");
 					break;
 				case "openLanguageDialog":
 					this.closeMenu();
@@ -852,6 +890,8 @@ export default {
 	},
 	emits: [
 		"close-shift",
+		"x-reading",
+		"z-reading",
 		"sync-invoices",
 		"open-employee-switch",
 		"lock-pos",
@@ -970,7 +1010,7 @@ export default {
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	border-bottom: 1px solid rgba(25, 118, 210, 0.08);
+	border-bottom: 1px solid rgba(211, 47, 47, 0.08);
 	flex-shrink: 0;
 }
 
@@ -1023,7 +1063,7 @@ export default {
 	padding: 12px;
 	border-radius: 16px;
 	border: 1px solid var(--pos-border);
-	background: linear-gradient(135deg, rgba(25, 118, 210, 0.06), rgba(66, 165, 245, 0.12));
+	background: linear-gradient(135deg, rgba(211, 47, 47, 0.06), rgba(255, 82, 82, 0.12));
 }
 
 .menu-profile-card__icon,
@@ -1151,7 +1191,7 @@ export default {
 .quick-action-card--primary .quick-action-card__icon,
 .settings-action--primary .settings-action__icon,
 .settings-launch-card__icon {
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
 }
 
 .quick-action-card--secondary .quick-action-card__icon,
@@ -1254,7 +1294,7 @@ export default {
 }
 
 .menu-item-compact:hover::before {
-	background: linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.08) 100%);
+	background: linear-gradient(135deg, rgba(211, 47, 47, 0.05) 0%, rgba(255, 82, 82, 0.08) 100%);
 }
 
 .menu-item-compact:hover {
@@ -1267,7 +1307,7 @@ export default {
 }
 
 .profile-info-mobile--static::before {
-	background: linear-gradient(135deg, rgba(25, 118, 210, 0.03) 0%, rgba(66, 165, 245, 0.05) 100%);
+	background: linear-gradient(135deg, rgba(211, 47, 47, 0.03) 0%, rgba(255, 82, 82, 0.05) 100%);
 }
 
 .profile-info-mobile--static:hover {
@@ -1301,8 +1341,8 @@ export default {
 
 /* Compact Icon Colors */
 .primary-icon {
-	background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
-	box-shadow: 0 2px 6px rgba(25, 118, 210, 0.2);
+	background: linear-gradient(135deg, #d32f2f 0%, #ff5252 100%);
+	box-shadow: 0 2px 6px rgba(211, 47, 47, 0.2);
 }
 
 .secondary-icon {
@@ -1356,7 +1396,7 @@ export default {
 /* Compact Hover Effects */
 .primary-action:hover .primary-icon {
 	transform: scale(1.1) rotate(5deg);
-	box-shadow: 0 3px 8px rgba(25, 118, 210, 0.25);
+	box-shadow: 0 3px 8px rgba(211, 47, 47, 0.25);
 }
 
 .secondary-action:hover .secondary-icon {
@@ -1470,24 +1510,24 @@ export default {
 
 /* Compact Focus States */
 .menu-item-compact:focus-visible {
-	outline: 1px solid #1976d2;
+	outline: 1px solid #d32f2f;
 	outline-offset: 1px;
 }
 
 .menu-btn-compact:focus-visible {
-	outline: 1px solid #1976d2;
+	outline: 1px solid #d32f2f;
 	outline-offset: 2px;
 }
 
 /* Dark Theme Adjustments */
 /* Theme-aware compact menu styling */
 .menu-btn-compact {
-	background: linear-gradient(135deg, #90caf9 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #90caf9 0%, #ff5252 100%);
 	color: var(--pos-text-primary) !important;
 }
 
 .menu-btn-compact:hover {
-	background: linear-gradient(135deg, #64b5f6 0%, #1976d2 100%);
+	background: linear-gradient(135deg, #ff8a80 0%, #d32f2f 100%);
 	box-shadow: 0 4px 12px rgba(144, 202, 249, 0.3);
 }
 
@@ -1536,7 +1576,7 @@ export default {
 /* Dark mode icon adjustments */
 :deep([data-theme="dark"]) .primary-icon,
 :deep(.v-theme--dark) .primary-icon {
-	background: linear-gradient(135deg, #90caf9 0%, #42a5f5 100%);
+	background: linear-gradient(135deg, #90caf9 0%, #ff5252 100%);
 	box-shadow: 0 2px 6px rgba(144, 202, 249, 0.3);
 }
 

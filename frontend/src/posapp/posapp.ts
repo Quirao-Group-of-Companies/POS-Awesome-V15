@@ -34,6 +34,7 @@ import {
 } from "./utils/chunkLoadRecovery";
 import { finalizePendingBundleActivation } from "./utils/bundleVersionActivation";
 import { reconcileBuildChangeOnStartup } from "./utils/buildCacheReconciler";
+import { installPwaBranding } from "./utils/pwaBranding";
 import { initPromise, isOffline } from "../offline";
 import App from "./App.vue";
 // @ts-ignore
@@ -79,12 +80,7 @@ async function startOptionalRuntimeServices() {
 		console.warn("Failed to initialize POS service worker updater", error);
 	});
 
-	if (!document.querySelector('link[rel="manifest"]')) {
-		const link = document.createElement("link");
-		link.rel = "manifest";
-		link.href = "/manifest.json";
-		document.head.appendChild(link);
-	}
+	installPwaBranding();
 
 	if (
 		("serviceWorker" in navigator &&

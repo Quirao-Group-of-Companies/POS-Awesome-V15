@@ -410,10 +410,23 @@ export function get_invoice_doc(context: any) {
 	let grandTotal = context.subtotal;
 
 	let serviceCharge = flt(context.service_charge || sourceDoc.posa_service_charge || 0);
-	let specialDiscountAmount = -Math.abs(flt(
-		context.invoice_doc?.custom_special_discount_amount ||
-		sourceDoc.custom_special_discount_amount || 0
-	));
+	const scDiscountAbs = Math.abs(
+		flt(
+			sourceDoc.custom_sc_discount_amount ||
+				context.invoice_doc?.custom_sc_discount_amount ||
+				sourceDoc.custom_special_discount_amount ||
+				context.invoice_doc?.custom_special_discount_amount ||
+				0,
+		),
+	);
+	const vatExemptAbs = Math.abs(
+		flt(
+			sourceDoc.custom_vat_exempt_amount ||
+				context.invoice_doc?.custom_vat_exempt_amount ||
+				0,
+		),
+	);
+	let specialDiscountAmount = -(scDiscountAbs + vatExemptAbs);
 	if (isReturn && serviceCharge > 0) {
 		serviceCharge = -Math.abs(serviceCharge);
 	}

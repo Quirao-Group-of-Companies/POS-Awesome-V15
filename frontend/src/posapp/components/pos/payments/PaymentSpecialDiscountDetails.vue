@@ -17,6 +17,46 @@
 					clearable
 				/>
 			</v-col>
+			<v-col cols="12" sm="6" class="pb-0">
+				<v-text-field
+					v-model.number="localTotalPax"
+					type="number"
+					min="1"
+					step="1"
+					class="pa-0 sleek-field"
+					variant="solo"
+					density="compact"
+					color="primary"
+					:label="__('Total Pax')"
+					:hint="totalPaxHint"
+					persistent-hint
+					hide-details
+					@update:model-value="onTotalPaxChange"
+				/>
+			</v-col>
+			<v-col
+				v-if="isScPwdType"
+				cols="12"
+				sm="6"
+				class="pb-0"
+			>
+				<v-text-field
+					:model-value="effectiveScPax"
+					@update:model-value="onScPaxChange"
+					type="number"
+					min="1"
+					:max="normalizedTotalPax"
+					step="1"
+					class="pa-0 sleek-field"
+					variant="solo"
+					density="compact"
+					color="primary"
+					:label="__('SC/PWD Pax')"
+					hide-details
+					:hint="__('Must be at least 1 for discount to apply')"
+					persistent-hint
+				/>
+			</v-col>
 			<v-col cols="12" class="pb-0">
 				<v-textarea
 					class="pa-0 sleek-field"
@@ -44,7 +84,27 @@
 				></v-textarea>
 			</v-col>
 
-			<!-- Action buttons — only shown when all three fields are filled -->
+			<v-col
+				v-if="isDiscountEligible && isScPwdType && scPwdBreakdown.totalDiscount > 0"
+				cols="12"
+				class="pt-0"
+			>
+				<div class="discount-preview text-caption">
+					<div class="discount-preview__row">
+						<span>{{ __("VAT Exemption") }}</span>
+						<strong>{{ formatMoney(scPwdBreakdown.vatExempt) }}</strong>
+					</div>
+					<div class="discount-preview__row">
+						<span>{{ __("20% SC/PWD Discount") }}</span>
+						<strong>{{ formatMoney(scPwdBreakdown.scDiscount) }}</strong>
+					</div>
+					<div class="discount-preview__row discount-preview__row--total">
+						<span>{{ __("Total deduction") }}</span>
+						<strong>{{ formatMoney(scPwdBreakdown.totalDeduction) }}</strong>
+					</div>
+				</div>
+			</v-col>
+
 			<v-col v-if="isDiscountEligible" cols="12" class="pt-1 d-flex gap-2">
 				<v-btn
 					color="primary"
@@ -67,14 +127,19 @@
 				</v-btn>
 			</v-col>
 
-			<!-- Discount summary — shown after save -->
 			<v-col v-if="isApplied" cols="12" class="pt-1">
-				<div class="discount-summary">
-					<span class="text-caption text-success">
-						✓ {{ __("Discount applied") }}:
-						{{ selectedDiscountType }} —
-						{{ __("Total Discount") }}: {{ totalDiscount }}
-					</span>
+				<div class="discount-summary text-caption text-success">
+					<div class="discount-summary__title">
+						✓ {{ __("Discount applied") }}: {{ selectedDiscountType }}
+					</div>
+					<div class="discount-preview__row">
+						<span>{{ __("SC/PWD Discount") }}</span>
+						<strong>{{ formatMoney(appliedScDiscount) }}</strong>
+					</div>
+					<div v-if="appliedVatExempt > 0" class="discount-preview__row">
+						<span>{{ __("VAT Exempt") }}</span>
+						<strong>{{ formatMoney(appliedVatExempt) }}</strong>
+					</div>
 				</div>
 			</v-col>
 		</v-row>
@@ -82,18 +147,30 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
-import { useUIStore } from "../../../stores/uiStore.ts";
+import { ref, computed, watch, getCurrentInstance, onMounted, onBeforeUnmount } from "vue";
 import { useInvoiceStore } from "../../../stores/invoiceStore.js";
+import { useFormat } from "../../../format.ts";
 import { capitalize } from "lodash";
+import {
+	applyPhScPwdDiscountToDoc,
+	captureOriginalTotals,
+	clearPhScPwdDiscountFromDoc,
+	computePhScPwdBreakdownFromGrandTotal,
+	computePhScPwdBreakdownFromItems,
+	resolveTotalPaxFromDoc,
+	round2,
+} from "../../../utils/phScPwdDiscount.ts";
 
 const props = defineProps({
 	invoiceDoc: { type: Object, required: true },
 });
 
-const uiStore = useUIStore();
 const invoiceStore = useInvoiceStore();
+const { formatCurrency, currencySymbol } = useFormat();
+const instance = getCurrentInstance();
+const eventBus = instance?.proxy?.eventBus;
 const __ = window.__ || ((text) => text);
+const frappe = window.frappe;
 
 const discountTypes = ["Senior Citizen", "PWD"];
 const selectedDiscountType = ref("");
@@ -101,59 +178,153 @@ const discountName = ref("");
 const discountID = ref("");
 const saving = ref(false);
 const isApplied = ref(false);
+const appliedScDiscount = ref(0);
+const appliedVatExempt = ref(0);
+const originalValues = ref(captureOriginalTotals(null));
 
-const originalValues = ref({
-	net_total: null,
-	total: null,
-	grand_total: null,
+const localTotalPax = ref(1);
+const localScPax = ref(1);
+const userAdjustedTotalPax = ref(false);
+
+const totalPaxHint = computed(() => {
+	const count = Math.max(1, Math.floor(Number(props.invoiceDoc?.custom_customer_count ?? 1)));
+	if (userAdjustedTotalPax.value) {
+		return __("Adjusted from customer count ({0})", [count]);
+	}
+	return __("From customer count ({0}) — adjust if needed", [count]);
 });
 
-watch(
-	() => props.invoiceDoc?.name,
-	(newName) => {
-		if (!newName) return;
-		const doc = props.invoiceDoc;
-		originalValues.value = {
-			net_total: parseFloat(doc?.custom_original_net_total || doc?.net_total || 0),
-			total: parseFloat(doc?.custom_original_total || doc?.total || 0),
-			grand_total: parseFloat(doc?.custom_original_grand_total || doc?.grand_total || 0),
-		};
-		isApplied.value = Boolean(doc?.custom_special_discount_amount);
-	},
-	{ immediate: true },
+const normalizedTotalPax = computed(() =>
+	Math.max(1, Math.floor(Number(localTotalPax.value) || 1)),
 );
 
-const customerCount = computed(() => props.invoiceDoc?.custom_customer_count || 1);
+const effectiveScPax = computed(() => {
+	if (!isScPwdType.value) return 0;
+	const total = normalizedTotalPax.value;
+	const raw = Math.floor(Number(localScPax.value) || 0);
+	return Math.max(1, Math.min(total, raw));
+});
 
-const grandTotal = computed(
-	() => originalValues.value.grand_total || props.invoiceDoc?.grand_total || 0,
+const isScPwdType = computed(
+	() =>
+		selectedDiscountType.value === "Senior Citizen" ||
+		selectedDiscountType.value === "PWD",
 );
 
-const specialDiscountPercent = computed(() => {
-	const val = uiStore?.posSettings?.custom_special_discount_percent || 20;
-	return val / 100;
+const scPwdBreakdown = computed(() => {
+	if (!isScPwdType.value) {
+		return computePhScPwdBreakdownFromGrandTotal(0, 1, 0);
+	}
+
+	const storeItems = invoiceStore.items || [];
+	const docItems = Array.isArray(props.invoiceDoc?.items) ? props.invoiceDoc.items : [];
+	const items = storeItems.length ? storeItems : docItems;
+
+	if (items.length) {
+		return computePhScPwdBreakdownFromItems(
+			items,
+			normalizedTotalPax.value,
+			effectiveScPax.value,
+		);
+	}
+
+	const baseGrand = captureOriginalTotals(props.invoiceDoc).grand_total;
+	return computePhScPwdBreakdownFromGrandTotal(
+		baseGrand,
+		normalizedTotalPax.value,
+		effectiveScPax.value,
+	);
 });
 
 const isDiscountEligible = computed(
 	() =>
 		Boolean(selectedDiscountType.value?.trim()) &&
 		Boolean(discountName.value?.trim()) &&
-		Boolean(discountID.value?.trim()),
+		Boolean(discountID.value?.trim()) &&
+		(!isScPwdType.value || effectiveScPax.value >= 1),
 );
 
-const totalDiscount = computed(() => {
-	if (!isDiscountEligible.value) return 0;
-	return Math.round((grandTotal.value / customerCount.value) * specialDiscountPercent.value);
+const formatMoney = (value) => {
+	const currency = props.invoiceDoc?.currency || "";
+	const symbol = currencySymbol(currency);
+	return `${symbol} ${formatCurrency(round2(value))}`;
+};
+
+const syncPaymentsToGrandTotal = (doc, grandTotal) => {
+	const payments = Array.isArray(doc?.payments) ? doc.payments.map((p) => ({ ...p })) : [];
+	const defaultPayment = payments.find((p) => p.default === 1) || payments[0];
+	if (!defaultPayment) return payments;
+
+	const otherPaymentsTotal = payments
+		.filter((p) => p !== defaultPayment)
+		.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+	defaultPayment.amount = round2(Math.max(grandTotal - otherPaymentsTotal, 0));
+	return payments;
+};
+
+const loadPaxFromDoc = (doc) => {
+	if (!doc) return;
+	localTotalPax.value = resolveTotalPaxFromDoc(doc, {
+		userAdjusted: userAdjustedTotalPax.value,
+	});
+	const scFromDoc = Math.floor(Number(doc.custom_sc_pwd_pax ?? 0));
+	localScPax.value = scFromDoc > 0 ? scFromDoc : isScPwdType.value ? 1 : 0;
+};
+
+const syncTotalPaxFromCustomerCount = (doc = props.invoiceDoc, { force = false } = {}) => {
+	if (!doc) return;
+	if (!force && (userAdjustedTotalPax.value || isApplied.value)) return;
+
+	const next = resolveTotalPaxFromDoc(doc, { userAdjusted: false });
+	if (localTotalPax.value !== next) {
+		localTotalPax.value = next;
+		syncMetaToStore();
+	}
+};
+
+const onTotalPaxChange = (value) => {
+	userAdjustedTotalPax.value = true;
+	const next = Math.max(1, Math.floor(Number(value) || 1));
+	localTotalPax.value = next;
+	syncMetaToStore();
+};
+
+const onPaymentOpen = () => {
+	userAdjustedTotalPax.value = false;
+	const doc = invoiceStore.invoiceDoc || props.invoiceDoc;
+	syncTotalPaxFromCustomerCount(doc, { force: true });
+	loadPaxFromDoc(doc);
+};
+
+onMounted(() => {
+	eventBus?.on?.("send_invoice_doc_payment", onPaymentOpen);
 });
 
-const discountedTotals = computed(() => {
-	const discount = totalDiscount.value;
-	return {
-		net_total: parseFloat((originalValues.value.net_total - discount).toFixed(2)),
-		total: parseFloat((originalValues.value.total - discount).toFixed(2)),
-		grand_total: parseFloat((originalValues.value.grand_total - discount).toFixed(2)),
-	};
+onBeforeUnmount(() => {
+	eventBus?.off?.("send_invoice_doc_payment", onPaymentOpen);
 });
+
+const refreshFromDoc = (doc) => {
+	if (!doc) return;
+	originalValues.value = captureOriginalTotals(doc);
+	loadPaxFromDoc(doc);
+	const applied = round2(doc.custom_sc_discount_amount) > 0 || round2(doc.discount_amount) > 0;
+	isApplied.value = applied;
+	appliedScDiscount.value = round2(doc.custom_sc_discount_amount);
+	appliedVatExempt.value = round2(doc.custom_vat_exempt_amount);
+};
+
+watch(
+	() => props.invoiceDoc?.name,
+	() => refreshFromDoc(props.invoiceDoc),
+	{ immediate: true },
+);
+
+watch(
+	() => props.invoiceDoc?.custom_customer_count,
+	() => syncTotalPaxFromCustomerCount(props.invoiceDoc),
+);
 
 watch(
 	() => props.invoiceDoc?.custom_special_discount_type,
@@ -177,97 +348,133 @@ watch(
 	{ immediate: true },
 );
 
+watch(selectedDiscountType, (type) => {
+	if ((type === "Senior Citizen" || type === "PWD") && localScPax.value < 1) {
+		localScPax.value = 1;
+	}
+	syncMetaToStore();
+});
+
+const onScPaxChange = (value) => {
+	const total = normalizedTotalPax.value;
+	let next = Math.floor(Number(value) || 0);
+	if (next < 1) next = 1;
+	if (next > total) next = total;
+	localScPax.value = next;
+	syncMetaToStore();
+};
+
 const syncMetaToStore = () => {
-	invoiceStore.setInvoiceDoc({
-		...invoiceStore.invoiceDoc,
+	invoiceStore.mergeInvoiceDoc({
 		custom_special_discount_type: selectedDiscountType.value,
 		custom_special_discount_name: discountName.value,
 		custom_special_discount_id_number: discountID.value,
+		custom_total_pax: normalizedTotalPax.value,
+		custom_sc_pwd_pax: isScPwdType.value ? effectiveScPax.value : 0,
 	});
 };
 
 const handleSave = () => {
 	if (!isDiscountEligible.value) return;
-	saving.value = true;
 
-	const totals = discountedTotals.value;
-	const currentDoc = invoiceStore.invoiceDoc;
-
-	const payments = Array.isArray(currentDoc?.payments)
-		? currentDoc.payments.map((p) => ({ ...p }))
-		: [];
-
-	const defaultPayment = payments.find((p) => p.default === 1) || payments[0];
-	if (defaultPayment) {
-		const otherPaymentsTotal = payments
-			.filter((p) => p !== defaultPayment)
-			.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-		defaultPayment.amount = parseFloat(
-			Math.max(totals.grand_total - otherPaymentsTotal, 0).toFixed(2),
+	const breakdown = scPwdBreakdown.value;
+	if (breakdown.totalDeduction <= 0) {
+		frappe?.msgprint?.(
+			__(
+				"SC/PWD discount is zero. Set SC/PWD Pax to at least 1 and click Apply again.",
+			),
 		);
+		return;
 	}
 
-	invoiceStore.setInvoiceDoc({
-		...currentDoc,
-		custom_original_net_total: originalValues.value.net_total,
-		custom_original_total: originalValues.value.total,
-		custom_original_grand_total: originalValues.value.grand_total,
-		custom_special_discount_type: selectedDiscountType.value,
-		custom_special_discount_name: discountName.value,
-		custom_special_discount_id_number: discountID.value,
-		custom_special_discount_amount: totalDiscount.value,
-		net_total: totals.net_total,
-		total: totals.total,
-		grand_total: totals.grand_total,
-		payments,
+	saving.value = true;
+
+	const currentDoc = { ...(invoiceStore.invoiceDoc || props.invoiceDoc || {}) };
+	const original = captureOriginalTotals(currentDoc);
+	originalValues.value = original;
+
+	const patched = applyPhScPwdDiscountToDoc(currentDoc, original, breakdown, {
+		discountType: selectedDiscountType.value,
+		name: discountName.value.trim(),
+		idNumber: discountID.value.trim(),
+		totalPax: normalizedTotalPax.value,
+		scPax: effectiveScPax.value,
 	});
 
+	patched.payments = syncPaymentsToGrandTotal(patched, patched.grand_total);
+	invoiceStore.setInvoiceDoc(patched);
+
+	appliedScDiscount.value = breakdown.scDiscount;
+	appliedVatExempt.value = breakdown.vatExempt;
 	isApplied.value = true;
 	saving.value = false;
+
+	eventBus?.emit?.("payment_invoice_totals_updated");
 };
 
 const handleClear = () => {
+	const currentDoc = { ...(invoiceStore.invoiceDoc || props.invoiceDoc || {}) };
+	const original = captureOriginalTotals(currentDoc);
+	const cleared = clearPhScPwdDiscountFromDoc(currentDoc, original);
+	cleared.payments = syncPaymentsToGrandTotal(cleared, cleared.grand_total);
+
+	invoiceStore.setInvoiceDoc(cleared);
+
 	selectedDiscountType.value = "";
 	discountName.value = "";
 	discountID.value = "";
 	isApplied.value = false;
+	appliedScDiscount.value = 0;
+	appliedVatExempt.value = 0;
+	localScPax.value = 1;
+	userAdjustedTotalPax.value = false;
+	originalValues.value = original;
+	syncTotalPaxFromCustomerCount(cleared, { force: true });
 
-	const currentDoc = invoiceStore.invoiceDoc;
-
-	const payments = Array.isArray(currentDoc?.payments)
-		? currentDoc.payments.map((p) => ({ ...p }))
-		: [];
-
-	const defaultPayment = payments.find((p) => p.default === 1) || payments[0];
-	if (defaultPayment) {
-		const otherPaymentsTotal = payments
-			.filter((p) => p !== defaultPayment)
-			.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-		defaultPayment.amount = parseFloat(
-			Math.max(originalValues.value.grand_total - otherPaymentsTotal, 0).toFixed(2),
-		);
-	}
-
-	invoiceStore.setInvoiceDoc({
-		...currentDoc,
-		custom_special_discount_type: "",
-		custom_special_discount_name: "",
-		custom_special_discount_id_number: "",
-		custom_special_discount_amount: 0,
-		net_total: originalValues.value.net_total,
-		total: originalValues.value.total,
-		grand_total: originalValues.value.grand_total,
-		custom_original_net_total: null,
-		custom_original_total: null,
-		custom_original_grand_total: null,
-		payments,
-	});
+	eventBus?.emit?.("payment_invoice_totals_updated");
 };
 
-watch(selectedDiscountType, syncMetaToStore);
 watch(discountName, (newVal) => {
 	discountName.value = capitalize(newVal).trim();
 	syncMetaToStore();
 });
 watch(discountID, syncMetaToStore);
 </script>
+
+<style scoped>
+.discount-preview,
+.discount-summary {
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: rgba(var(--v-theme-surface-variant), 0.35);
+	color: var(--pos-text-primary, #fff);
+}
+
+.discount-preview {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.discount-summary {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.discount-summary__title {
+	margin-bottom: 2px;
+}
+
+.discount-preview__row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.discount-preview__row--total {
+	padding-top: 4px;
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+</style>

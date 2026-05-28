@@ -144,7 +144,7 @@
 				:label="frappe._('Special Discount')"
 				class="sleek-field pos-themed-input"
 				hide-details
-				:model-value="formatCurrency(invoice_doc.custom_special_discount_amount)"
+				:model-value="formatCurrency(specialDiscountDisplay)"
 				readonly
 				:prefix="currencySymbol(invoice_doc.currency)"
 				persistent-placeholder
@@ -190,10 +190,27 @@ const toNumber = (value) => {
 	return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const totalDiscountAmount = computed(
-	() =>
-		Math.abs(toNumber(props.itemDiscountTotal)) + Math.abs(toNumber(props.invoice_doc?.discount_amount)),
-);
+const totalDiscountAmount = computed(() => {
+	const additional = Math.abs(toNumber(props.invoice_doc?.discount_amount));
+	const itemDisc = Math.abs(toNumber(props.itemDiscountTotal));
+	// Prefer invoice-level additional discount when set (includes SC/PWD total deduction).
+	if (additional > 0) {
+		return itemDisc + additional;
+	}
+	const scPwd =
+		Math.abs(toNumber(props.invoice_doc?.custom_sc_discount_amount)) +
+		Math.abs(toNumber(props.invoice_doc?.custom_vat_exempt_amount));
+	return itemDisc + scPwd;
+});
+
+const specialDiscountDisplay = computed(() => {
+	const sc = Math.abs(toNumber(props.invoice_doc?.custom_sc_discount_amount));
+	const vat = Math.abs(toNumber(props.invoice_doc?.custom_vat_exempt_amount));
+	if (sc > 0 || vat > 0) {
+		return sc + vat;
+	}
+	return Math.abs(toNumber(props.invoice_doc?.custom_special_discount_amount));
+});
 
 const discountHelpText = computed(
 	() =>

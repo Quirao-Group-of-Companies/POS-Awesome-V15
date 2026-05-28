@@ -35,27 +35,35 @@
 				</thead>
 				<tbody>
 					<tr
-						v-for="line in orderLines"
-						:key="line.key"
+						v-for="row in orderLines"
+						:key="row.key"
 						class="payment-order-breakdown__row"
 					>
 						<td
 							class="text-start align-middle px-4 py-3 payment-order-breakdown__name"
 							style="width: 60%"
 						>
-							{{ line.name }}
+							<div class="font-weight-bold">
+								{{ row.item?.item_name || row.item?.item_code || __("Item") }}
+							</div>
+							<div
+								v-if="isScPwdDiscountActive && getItemVatExemption(row.item) > 0"
+								class="text-caption text-medium-emphasis pl-2"
+							>
+								Less VAT(12%): {{ getItemVatExemption(row.item) }}
+							</div>
 						</td>
 						<td
 							class="text-end align-middle px-4 py-3 payment-order-breakdown__qty-col"
 							style="width: 20%"
 						>
-							{{ line.qtyDisplay }}
+							{{ row.qtyDisplay }}
 						</td>
 						<td
 							class="text-end align-middle px-4 py-3 payment-order-breakdown__amount"
 							style="width: 20%"
 						>
-							{{ line.amountDisplay }}
+							{{ row.amountDisplay }}
 						</td>
 					</tr>
 				</tbody>
@@ -107,6 +115,47 @@ const resolveLineAmount = (item) => {
 	return flt(item?.qty) * flt(item?.rate);
 };
 
+const specialDiscountType = computed(() =>
+	String(props.invoiceDoc?.custom_special_discount_type || "").trim(),
+);
+
+const isScPwdDiscountActive = computed(() => {
+	const type = specialDiscountType.value;
+	if (type !== "Senior Citizen" && type !== "PWD") return false;
+	const sc = Math.floor(flt(props.invoiceDoc?.custom_sc_pwd_pax ?? 0));
+	return sc > 0;
+});
+
+const getPaxRatio = () => {
+	const doc = props.invoiceDoc;
+	const total = Math.max(
+		1,
+		Math.floor(flt(doc?.custom_total_pax ?? doc?.custom_customer_count ?? 1)),
+	);
+	const sc = Math.max(0, Math.min(total, Math.floor(flt(doc?.custom_sc_pwd_pax ?? 0))));
+	return sc > 0 ? sc / total : 0;
+};
+
+function getItemVatExemption(item) {
+	if (!isScPwdDiscountActive.value) return 0;
+
+	const ratio = getPaxRatio();
+	if (!ratio) return 0;
+
+	const grossAmount = resolveLineAmount(item);
+	if (!grossAmount) return 0;
+
+	const seniorShare = grossAmount * ratio;
+	// Equivalent to: (seniorShare / 1.12) * 0.12
+	const vatExempt = seniorShare - seniorShare / 1.12;
+	return formatVat(vatExempt);
+}
+
+function formatVat(value) {
+	const num = flt(value);
+	return num.toFixed(2);
+}
+
 const resolveLineKey = (item, index) => {
 	return (
 		item?.posa_row_id ||
@@ -128,7 +177,7 @@ const orderLines = computed(() => {
 
 			return {
 				key: resolveLineKey(item, index),
-				name: item.item_name || item.item_code || __("Item"),
+				item,
 				qtyDisplay: formatQty(qty),
 				amountDisplay: props.formatCurrency(amount, currency),
 			};
@@ -223,5 +272,9 @@ function formatQty(qty) {
 
 .payment-order-breakdown__empty {
 	font-size: 0.875rem;
+}
+
+.payment-order-breakdown__note {
+	line-height: 1.15;
 }
 </style>

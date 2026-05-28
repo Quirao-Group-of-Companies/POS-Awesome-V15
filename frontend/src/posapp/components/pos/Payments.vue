@@ -1926,7 +1926,18 @@ onMounted(() => {
 	eventBus.on("server-online", () => syncStore.syncPendingInvoices());
 
 	if (eventBus) {
+		eventBus.on("payment_invoice_totals_updated", () => {
+			syncPreferredPaymentToCurrentTotal();
+		});
+
 		eventBus.on("send_invoice_doc_payment", (doc) => {
+			const guestCount = Math.max(
+				1,
+				Math.floor(Number(doc?.custom_customer_count ?? 1)),
+			);
+			if (!Number(doc?.custom_sc_discount_amount || 0)) {
+				doc.custom_total_pax = guestCount;
+			}
 			invoiceStore.setInvoiceDoc(doc);
 			paid_change.value = flt(doc.paid_change || 0, currency_precision.value);
 			credit_change.value = flt(doc.credit_change || 0, currency_precision.value);
@@ -2000,6 +2011,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+	eventBus.off("payment_invoice_totals_updated");
 	eventBus.off("send_invoice_doc_payment");
 	eventBus.off("register_pos_profile");
 	eventBus.off("add_the_new_address");

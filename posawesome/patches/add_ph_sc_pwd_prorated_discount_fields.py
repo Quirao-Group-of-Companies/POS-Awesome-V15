@@ -104,14 +104,14 @@ def execute():
                 create_custom_field(doctype, field)
             else:
                 # Ensure the definition stays up-to-date across installs.
+                # Only set keys that are present — read_only cannot be NULL in DB.
                 updates = {
-                    "label": field.get("label"),
-                    "fieldtype": field.get("fieldtype"),
-                    "insert_after": field.get("insert_after"),
-                    "read_only": field.get("read_only"),
-                    "default": field.get("default"),
-                    "options": field.get("options"),
+                    k: field[k]
+                    for k in ("label", "fieldtype", "insert_after", "read_only", "default", "options")
+                    if k in field
                 }
+                if not updates:
+                    continue
                 frappe.db.set_value(
                     "Custom Field",
                     custom_field_name,

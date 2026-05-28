@@ -79,6 +79,7 @@ after_migrate = [
     "posawesome.patches.add_pos_skip_business_checks_profile_field.execute",
     "posawesome.patches.add_gift_card_invoice_redemption_fields.execute",
     "posawesome.patches.add_ph_sc_pwd_prorated_discount_fields.execute",
+    "posawesome.patches.remove_orphan_restaurant_kitchen_approval_link.execute",
     "posawesome.patches.add_gift_card_to_workspace.execute",
     "posawesome.patches.add_submission_ledger_to_workspace.execute",
     "posawesome.patches.migrate_pos_supervisor_to_role.execute",

@@ -41,8 +41,7 @@
 				class="pb-0"
 			>
 				<v-text-field
-					:model-value="effectiveScPax"
-					@update:model-value="onScPaxChange"
+					v-model.number="localScPax"
 					type="number"
 					min="1"
 					:max="normalizedTotalPax"
@@ -216,6 +215,14 @@ const normalizeDiscountType = (value) => {
 	return type === "PWD" || type === "Senior Citizen" ? type : "Senior Citizen";
 };
 
+const childTableData = computed(() =>
+	(discountPatrons.value || []).map((patron) => ({
+		discount_type: normalizeDiscountType(patron?.type || selectedDiscountType.value),
+		patron_name: String(patron?.name || "").trim(),
+		id_number: String(patron?.id || "").trim(),
+	})),
+);
+
 const ensurePatronCount = (desiredCount) => {
 	const nextCount = Math.max(0, Math.floor(Number(desiredCount) || 0));
 	const current = Array.isArray(discountPatrons.value) ? discountPatrons.value : [];
@@ -230,26 +237,16 @@ const ensurePatronCount = (desiredCount) => {
 };
 
 const parseExistingPatrons = (doc) => {
-	const rawNames = String(doc?.custom_special_discount_name || "").trim();
-	const rawIds = String(doc?.custom_special_discount_id_number || "").trim();
-	if (!rawNames && !rawIds) return null;
+	const rows = Array.isArray(doc?.custom_special_discount_details)
+		? doc.custom_special_discount_details
+		: [];
+	if (!rows.length) return null;
 
-	const names = rawNames ? rawNames.split(/\s*,\s*/).filter(Boolean) : [];
-	const ids = rawIds ? rawIds.split(/\s*,\s*/).filter(Boolean) : [];
-	const count = Math.max(names.length, ids.length);
-	if (!count) return null;
-
-	const patrons = [];
-	for (let i = 0; i < count; i++) {
-		const label = names[i] || "";
-		// Attempt: "Juan Dela Cruz (PWD)" → name="Juan Dela Cruz", type="PWD"
-		const match = label.match(/^(.*)\s+\((Senior Citizen|PWD)\)\s*$/);
-		const type = normalizeDiscountType(match?.[2] || selectedDiscountType.value);
-		const name = (match?.[1] || label).trim();
-		const id = String(ids[i] || "").trim();
-		patrons.push({ type, name, id });
-	}
-	return patrons;
+	return rows.map((row) => ({
+		type: normalizeDiscountType(row?.discount_type || selectedDiscountType.value),
+		name: String(row?.patron_name || "").trim(),
+		id: String(row?.id_number || "").trim(),
+	}));
 };
 
 const totalPaxHint = computed(() => {
@@ -277,6 +274,29 @@ const isScPwdType = computed(
 		selectedDiscountType.value === "PWD",
 );
 
+watch(
+	() => [localScPax.value, normalizedTotalPax.value, isScPwdType.value],
+	() => {
+		if (!isScPwdType.value) {
+			discountPatrons.value = [];
+			return;
+		}
+
+		const total = normalizedTotalPax.value;
+		let next = Math.floor(Number(localScPax.value) || 0);
+		if (next < 1) next = 1;
+		if (next > total) next = total;
+		if (next !== localScPax.value) {
+			localScPax.value = next;
+			return;
+		}
+
+		ensurePatronCount(next);
+		syncMetaToStore();
+	},
+	{ immediate: true },
+);
+
 const scPwdBreakdown = computed(() => {
 	if (!isScPwdType.value) {
 		return computePhScPwdBreakdownFromGrandTotal(0, 1, 0);
@@ -301,24 +321,6 @@ const scPwdBreakdown = computed(() => {
 		effectiveScPax.value,
 	);
 });
-
-const formattedNames = computed(() =>
-	(discountPatrons.value || [])
-		.map((p) => {
-			const name = String(p?.name || "").trim();
-			const type = normalizeDiscountType(p?.type || selectedDiscountType.value);
-			return name ? `${capitalize(name)} (${type})` : "";
-		})
-		.filter(Boolean)
-		.join(", "),
-);
-
-const formattedIDs = computed(() =>
-	(discountPatrons.value || [])
-		.map((p) => String(p?.id || "").trim())
-		.filter(Boolean)
-		.join(", "),
-);
 
 const isDiscountEligible = computed(
 	() =>
@@ -445,21 +447,10 @@ watch(
 	{ immediate: true },
 );
 
-const onScPaxChange = (value) => {
-	const total = normalizedTotalPax.value;
-	let next = Math.floor(Number(value) || 0);
-	if (next < 1) next = 1;
-	if (next > total) next = total;
-	localScPax.value = next;
-	syncMetaToStore();
-};
-
 const syncMetaToStore = () => {
 	invoiceStore.mergeInvoiceDoc({
-		// NOTE: backend schema is single-field; we squash patron info into strings
 		custom_special_discount_type: selectedDiscountType.value,
-		custom_special_discount_name: formattedNames.value,
-		custom_special_discount_id_number: formattedIDs.value,
+		custom_special_discount_details: childTableData.value,
 		custom_total_pax: normalizedTotalPax.value,
 		custom_sc_pwd_pax: isScPwdType.value ? effectiveScPax.value : 0,
 	});
@@ -486,8 +477,6 @@ const handleSave = () => {
 
 	const patched = applyPhScPwdDiscountToDoc(currentDoc, original, breakdown, {
 		discountType: selectedDiscountType.value,
-		name: formattedNames.value.trim(),
-		idNumber: formattedIDs.value.trim(),
 		totalPax: normalizedTotalPax.value,
 		scPax: effectiveScPax.value,
 	});
@@ -508,6 +497,7 @@ const handleClear = () => {
 	const original = captureOriginalTotals(currentDoc);
 	const cleared = clearPhScPwdDiscountFromDoc(currentDoc, original);
 	cleared.payments = syncPaymentsToGrandTotal(cleared, cleared.grand_total);
+	cleared.custom_special_discount_details = [];
 
 	invoiceStore.setInvoiceDoc(cleared);
 
@@ -525,7 +515,7 @@ const handleClear = () => {
 };
 
 watch(
-	() => props.invoiceDoc?.custom_special_discount_name,
+	() => props.invoiceDoc?.custom_special_discount_details,
 	() => {
 		const existing = parseExistingPatrons(props.invoiceDoc);
 		if (!existing) return;

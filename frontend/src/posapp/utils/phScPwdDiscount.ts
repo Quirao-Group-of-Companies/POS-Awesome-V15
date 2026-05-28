@@ -178,8 +178,6 @@ export function applyPhScPwdDiscountToDoc(
 	breakdown: PhScPwdBreakdown,
 	meta: {
 		discountType: string;
-		name: string;
-		idNumber: string;
 		totalPax: number;
 		scPax: number;
 	},
@@ -193,8 +191,6 @@ export function applyPhScPwdDiscountToDoc(
 		custom_original_grand_total: original.grand_total,
 		custom_original_total_taxes_and_charges: original.total_taxes_and_charges,
 		custom_special_discount_type: meta.discountType,
-		custom_special_discount_name: meta.name,
-		custom_special_discount_id_number: meta.idNumber,
 		custom_special_discount_amount: scDiscount,
 		custom_total_pax: meta.totalPax,
 		custom_sc_pwd_pax: meta.scPax,
@@ -216,8 +212,6 @@ export function clearPhScPwdDiscountFromDoc(
 	return {
 		...doc,
 		custom_special_discount_type: "",
-		custom_special_discount_name: "",
-		custom_special_discount_id_number: "",
 		custom_special_discount_amount: 0,
 		custom_sc_discount_amount: 0,
 		custom_vat_exempt_amount: 0,

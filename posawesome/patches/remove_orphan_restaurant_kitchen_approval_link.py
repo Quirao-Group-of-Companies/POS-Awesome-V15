@@ -14,7 +14,7 @@ def execute():
 			continue
 
 		if frappe.db.has_column(doctype, fieldname):
-			frappe.db.sql(f"ALTER TABLE `tab{doctype}` DROP COLUMN `{fieldname}`")
+			frappe.db.sql_ddl(f"ALTER TABLE `tab{doctype}` DROP COLUMN `{fieldname}`")
 
 	frappe.clear_cache(doctype="POS Invoice")
 	frappe.clear_cache(doctype="Sales Invoice")

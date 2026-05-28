@@ -1,49 +1,44 @@
 <template>
-	<v-card flat :class="['cards mb-0 mt-3 pa-0', { compact }]">
-		<v-row align="start" no-gutters>
-			<v-col cols="12" sm="6">
-				<v-btn
-					ref="submitButton"
-					block
-					size="large"
-					color="primary"
-					variant="flat"
-					class="payment-submit-btn payment-footer-btn"
-					@click="$emit('submit')"
-					:loading="loading"
-					:disabled="loading || validatePayment"
-					:class="{ 'submit-highlight': highlightSubmit }"
-				>
-					{{ __("Submit") }}
-				</v-btn>
-			</v-col>
-			<v-col cols="12" sm="6" class="payment-action-col">
-				<v-btn
-					block
-					size="large"
-					color="success"
-					variant="flat"
-					class="payment-submit-print-btn payment-footer-btn"
-					@click="$emit('submit-and-print')"
-					:loading="loading"
-					:disabled="loading || validatePayment"
-				>
-					{{ __("Submit & Print") }}
-				</v-btn>
-			</v-col>
-			<v-col cols="12">
-				<v-btn
-					block
-					size="large"
-					color="error"
-					variant="flat"
-					class="mt-2 pa-1 payment-cancel-btn payment-footer-btn"
-					@click="$emit('cancel')"
-				>
-					{{ __("Cancel Payment") }}
-				</v-btn>
-			</v-col>
-		</v-row>
+	<v-card flat :class="['cards mb-0 mt-2 pa-0', { compact }]">
+		<v-card-actions class="payment-footer-actions px-2 py-2">
+			<v-btn
+				variant="text"
+				color="error"
+				size="default"
+				class="payment-cancel-btn text-none"
+				@click="$emit('cancel')"
+			>
+				{{ __("Cancel Payment") }}
+			</v-btn>
+
+			<v-spacer />
+
+			<v-btn
+				ref="submitButton"
+				variant="outlined"
+				color="secondary"
+				size="large"
+				class="payment-submit-btn text-none"
+				:class="{ 'submit-highlight': highlightSubmit }"
+				@click="$emit('submit')"
+				:loading="loading"
+				:disabled="loading || validatePayment"
+			>
+				{{ __("Submit") }}
+			</v-btn>
+
+			<v-btn
+				variant="flat"
+				color="success"
+				size="x-large"
+				class="payment-submit-print-btn text-none ml-2"
+				@click="$emit('submit-and-print')"
+				:loading="loading"
+				:disabled="loading || validatePayment"
+			>
+				{{ __("Submit & Print") }}
+			</v-btn>
+		</v-card-actions>
 	</v-card>
 </template>
 
@@ -65,111 +60,97 @@ const __ = window.__;
 	background: transparent !important;
 }
 
-.compact :deep(.v-btn),
-:deep(.compact .v-btn) {
-	min-height: 42px;
-}
-
-.payment-footer-btn {
-	--v-theme-overlay-multiplier: 0 !important;
-	transition:
-		box-shadow 0.18s ease,
-		background-color 0.18s ease,
-		transform 0.18s ease !important;
-	color: #ffffff !important;
-	min-height: 48px !important;
-}
-
-.payment-submit-btn {
-	background-color: rgb(var(--v-theme-primary)) !important;
-}
-
-.payment-submit-print-btn {
-	background-color: rgb(var(--v-theme-success)) !important;
+.payment-footer-actions {
+	flex-wrap: nowrap;
+	gap: 8px;
+	min-height: 52px;
 }
 
 .payment-cancel-btn {
-	background-color: rgb(var(--v-theme-error)) !important;
+	flex: 0 0 auto;
+	font-weight: 600;
 }
 
-.payment-footer-btn:hover,
-.payment-footer-btn:focus,
-.payment-footer-btn:focus-visible,
-.payment-footer-btn:active {
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18) !important;
-	transform: translateY(-1px);
+.payment-submit-btn {
+	flex: 0 0 auto;
+	min-width: 112px;
+	border-width: 1.5px;
+	font-weight: 600;
 }
 
-.payment-submit-btn:hover,
-.payment-submit-btn:focus,
-.payment-submit-btn:focus-visible,
-.payment-submit-btn:active {
-	background-color: rgba(var(--v-theme-primary), 0.9) !important;
+.payment-submit-print-btn {
+	flex: 0 0 auto;
+	min-width: 168px;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	box-shadow: 0 6px 18px rgba(var(--v-theme-success), 0.28);
 }
 
 .payment-submit-print-btn:hover,
-.payment-submit-print-btn:focus,
-.payment-submit-print-btn:focus-visible,
-.payment-submit-print-btn:active {
-	background-color: rgba(var(--v-theme-success), 0.9) !important;
+.payment-submit-print-btn:focus-visible {
+	box-shadow: 0 8px 22px rgba(var(--v-theme-success), 0.36);
 }
 
-.payment-cancel-btn:hover,
-.payment-cancel-btn:focus,
-.payment-cancel-btn:focus-visible,
-.payment-cancel-btn:active {
-	background-color: rgba(var(--v-theme-error), 0.9) !important;
+.submit-highlight.payment-submit-btn {
+	box-shadow: 0 0 0 2px rgba(var(--v-theme-secondary), 0.45);
 }
 
-.payment-action-col {
-	padding-left: 4px;
+.compact .payment-footer-actions {
+	min-height: 44px;
+	padding-top: 4px !important;
+	padding-bottom: 4px !important;
 }
 
-.payment-footer-btn:active {
-	transform: translateY(0);
+.compact .payment-submit-print-btn {
+	min-height: 42px !important;
 }
 
-:deep(.payment-footer-btn .v-btn__overlay),
-:deep(.payment-footer-btn .v-btn__underlay) {
-	opacity: 0 !important;
-	background: transparent !important;
+.compact .payment-submit-btn {
+	min-height: 38px !important;
 }
 
 @media (max-width: 768px) {
-	.cards {
-		margin-top: 0 !important;
+	.payment-footer-actions {
+		flex-wrap: wrap;
+		row-gap: 6px;
 	}
 
-	.payment-action-col {
-		padding-left: 0;
-		padding-top: 6px;
+	.payment-cancel-btn {
+		order: 1;
 	}
 
-	.payment-footer-btn {
-		font-size: 0.82rem !important;
+	.v-spacer {
+		order: 2;
+		flex: 1 1 100% !important;
+		display: none;
 	}
 
-	:deep(.payment-footer-btn.v-btn) {
-		min-height: 38px !important;
+	.payment-submit-btn {
+		order: 3;
+		flex: 1 1 calc(50% - 4px);
+		min-width: 0;
 	}
 
-	:deep(.payment-footer-btn .v-btn__content) {
-		font-size: 0.82rem !important;
-		line-height: 1.15;
+	.payment-submit-print-btn {
+		order: 4;
+		flex: 1 1 calc(50% - 4px);
+		min-width: 0;
+		margin-left: 0 !important;
 	}
 }
 
 @media (max-width: 480px) {
-	.payment-footer-btn {
-		font-size: 0.76rem !important;
+	.payment-footer-actions {
+		flex-direction: column;
+		align-items: stretch;
 	}
 
-	:deep(.payment-footer-btn.v-btn) {
-		min-height: 34px !important;
-	}
-
-	:deep(.payment-footer-btn .v-btn__content) {
-		font-size: 0.76rem !important;
+	.payment-cancel-btn,
+	.payment-submit-btn,
+	.payment-submit-print-btn {
+		width: 100%;
+		flex: 1 1 auto;
+		margin-left: 0 !important;
 	}
 }
 </style>

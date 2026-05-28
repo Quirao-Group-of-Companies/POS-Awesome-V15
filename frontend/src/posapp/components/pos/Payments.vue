@@ -90,6 +90,15 @@
 					</section>
 
 					<section class="payment-section payment-section--adjustments">
+						<div class="payment-section__subsection payment-order-breakdown-section">
+							<h3 class="payment-section__title payment-section__title--subsection">
+								{{ __("Order Breakdown") }}
+							</h3>
+							<PaymentOrderBreakdown
+								:invoice-doc="invoice_doc"
+								:format-currency="formatCurrency"
+							/>
+						</div>
 						<div class="payment-section__header">
 							<h3 class="payment-section__title">{{ __("Redemption and Totals") }}</h3>
 						</div>
@@ -320,6 +329,7 @@ import InvoiceTotals from "./payments/InvoiceTotals.vue";
 import PaymentActionButtons from "./payments/PaymentActionButtons.vue";
 import PaymentMethods from "./payments/PaymentMethods.vue";
 import PaymentGiftCardSection from "./payments/PaymentGiftCardSection.vue";
+import PaymentOrderBreakdown from "./payments/PaymentOrderBreakdown.vue";
 import PaymentRedemption from "./payments/PaymentRedemption.vue";
 import PaymentAdditionalInfo from "./payments/PaymentAdditionalInfo.vue";
 import PaymentPurchaseOrder from "./payments/PaymentPurchaseOrder.vue";
@@ -2139,6 +2149,10 @@ onBeforeUnmount(() => {
 	font-size: 0.92rem;
 }
 
+.payment-order-breakdown-section {
+	margin-bottom: var(--pos-space-2, 8px);
+}
+
 :deep(.payment-section .v-divider) {
 	display: none;
 }
@@ -2164,8 +2178,12 @@ onBeforeUnmount(() => {
 	margin-top: 0 !important;
 }
 
-:deep(.payment-footer--dialog .v-btn) {
-	min-height: 42px;
+:deep(.payment-footer--dialog .payment-submit-print-btn.v-btn) {
+	min-height: 48px;
+}
+
+:deep(.payment-footer--dialog .payment-submit-btn.v-btn) {
+	min-height: 40px;
 }
 
 :deep(.payment-shell--dialog .payment-methods) {

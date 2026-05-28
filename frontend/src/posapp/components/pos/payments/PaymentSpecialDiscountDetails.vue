@@ -57,31 +57,56 @@
 					persistent-hint
 				/>
 			</v-col>
-			<v-col cols="12" class="pb-0">
-				<v-textarea
-					class="pa-0 sleek-field"
-					variant="solo"
-					density="compact"
-					clearable
-					color="primary"
-					auto-grow
-					rows="2"
-					:label="__('Name')"
-					v-model="discountName"
-				></v-textarea>
-			</v-col>
-			<v-col cols="12" class="pt-0">
-				<v-textarea
-					class="pa-0 sleek-field"
-					variant="solo"
-					density="compact"
-					clearable
-					color="primary"
-					auto-grow
-					rows="2"
-					:label="__('ID Number')"
-					v-model="discountID"
-				></v-textarea>
+			<v-col v-if="isScPwdType" cols="12" class="pb-0">
+				<div class="patrons">
+					<div
+						v-for="(patron, index) in discountPatrons"
+						:key="index"
+						class="patron-card"
+						:class="{ 'patron-card--stacked': effectiveScPax > 1 }"
+					>
+						<div class="patron-card__header text-caption">
+							<strong>{{ __('Patron') }} {{ index + 1 }}</strong>
+						</div>
+						<v-row dense class="ma-0">
+							<v-col cols="12" sm="4" class="pt-1 pb-0">
+								<v-select
+									v-model="patron.type"
+									:items="discountTypes"
+									variant="outlined"
+									density="compact"
+									hide-details
+									:label="__('Type')"
+									@update:model-value="syncMetaToStore"
+								/>
+							</v-col>
+							<v-col cols="12" sm="4" class="pt-1 pb-0">
+								<v-text-field
+									v-model="patron.name"
+									variant="solo"
+									density="compact"
+									hide-details
+									class="pa-0 sleek-field"
+									color="primary"
+									:label="__('Name')"
+									@update:model-value="syncMetaToStore"
+								/>
+							</v-col>
+							<v-col cols="12" sm="4" class="pt-1 pb-0">
+								<v-text-field
+									v-model="patron.id"
+									variant="solo"
+									density="compact"
+									hide-details
+									class="pa-0 sleek-field"
+									color="primary"
+									:label="__('ID Number')"
+									@update:model-value="syncMetaToStore"
+								/>
+							</v-col>
+						</v-row>
+					</div>
+				</div>
 			</v-col>
 
 			<v-col
@@ -174,8 +199,6 @@ const frappe = window.frappe;
 
 const discountTypes = ["Senior Citizen", "PWD"];
 const selectedDiscountType = ref("");
-const discountName = ref("");
-const discountID = ref("");
 const saving = ref(false);
 const isApplied = ref(false);
 const appliedScDiscount = ref(0);
@@ -185,6 +208,49 @@ const originalValues = ref(captureOriginalTotals(null));
 const localTotalPax = ref(1);
 const localScPax = ref(1);
 const userAdjustedTotalPax = ref(false);
+
+const discountPatrons = ref([]);
+
+const normalizeDiscountType = (value) => {
+	const type = String(value || "").trim();
+	return type === "PWD" || type === "Senior Citizen" ? type : "Senior Citizen";
+};
+
+const ensurePatronCount = (desiredCount) => {
+	const nextCount = Math.max(0, Math.floor(Number(desiredCount) || 0));
+	const current = Array.isArray(discountPatrons.value) ? discountPatrons.value : [];
+	if (current.length === nextCount) return;
+
+	const defaultType = normalizeDiscountType(selectedDiscountType.value);
+	const next = current.slice(0, nextCount);
+	while (next.length < nextCount) {
+		next.push({ type: defaultType, name: "", id: "" });
+	}
+	discountPatrons.value = next;
+};
+
+const parseExistingPatrons = (doc) => {
+	const rawNames = String(doc?.custom_special_discount_name || "").trim();
+	const rawIds = String(doc?.custom_special_discount_id_number || "").trim();
+	if (!rawNames && !rawIds) return null;
+
+	const names = rawNames ? rawNames.split(/\s*,\s*/).filter(Boolean) : [];
+	const ids = rawIds ? rawIds.split(/\s*,\s*/).filter(Boolean) : [];
+	const count = Math.max(names.length, ids.length);
+	if (!count) return null;
+
+	const patrons = [];
+	for (let i = 0; i < count; i++) {
+		const label = names[i] || "";
+		// Attempt: "Juan Dela Cruz (PWD)" → name="Juan Dela Cruz", type="PWD"
+		const match = label.match(/^(.*)\s+\((Senior Citizen|PWD)\)\s*$/);
+		const type = normalizeDiscountType(match?.[2] || selectedDiscountType.value);
+		const name = (match?.[1] || label).trim();
+		const id = String(ids[i] || "").trim();
+		patrons.push({ type, name, id });
+	}
+	return patrons;
+};
 
 const totalPaxHint = computed(() => {
 	const count = Math.max(1, Math.floor(Number(props.invoiceDoc?.custom_customer_count ?? 1)));
@@ -236,12 +302,32 @@ const scPwdBreakdown = computed(() => {
 	);
 });
 
+const formattedNames = computed(() =>
+	(discountPatrons.value || [])
+		.map((p) => {
+			const name = String(p?.name || "").trim();
+			const type = normalizeDiscountType(p?.type || selectedDiscountType.value);
+			return name ? `${capitalize(name)} (${type})` : "";
+		})
+		.filter(Boolean)
+		.join(", "),
+);
+
+const formattedIDs = computed(() =>
+	(discountPatrons.value || [])
+		.map((p) => String(p?.id || "").trim())
+		.filter(Boolean)
+		.join(", "),
+);
+
 const isDiscountEligible = computed(
 	() =>
 		Boolean(selectedDiscountType.value?.trim()) &&
-		Boolean(discountName.value?.trim()) &&
-		Boolean(discountID.value?.trim()) &&
-		(!isScPwdType.value || effectiveScPax.value >= 1),
+		(!isScPwdType.value || effectiveScPax.value >= 1) &&
+		(discountPatrons.value || []).length === effectiveScPax.value &&
+		(discountPatrons.value || []).every(
+			(p) => String(p?.name || "").trim() && String(p?.id || "").trim(),
+		),
 );
 
 const formatMoney = (value) => {
@@ -333,27 +419,31 @@ watch(
 	},
 	{ immediate: true },
 );
-watch(
-	() => props.invoiceDoc?.custom_special_discount_name,
-	(val) => {
-		discountName.value = val || "";
-	},
-	{ immediate: true },
-);
-watch(
-	() => props.invoiceDoc?.custom_special_discount_id_number,
-	(val) => {
-		discountID.value = val || "";
-	},
-	{ immediate: true },
-);
 
 watch(selectedDiscountType, (type) => {
 	if ((type === "Senior Citizen" || type === "PWD") && localScPax.value < 1) {
 		localScPax.value = 1;
 	}
+	// Default any empty patron types to the newly selected type.
+	const nextType = normalizeDiscountType(type);
+	discountPatrons.value = (discountPatrons.value || []).map((p) => ({
+		...p,
+		type: p?.type ? normalizeDiscountType(p.type) : nextType,
+	}));
 	syncMetaToStore();
 });
+
+watch(
+	() => effectiveScPax.value,
+	(next) => {
+		if (!isScPwdType.value) {
+			discountPatrons.value = [];
+			return;
+		}
+		ensurePatronCount(next);
+	},
+	{ immediate: true },
+);
 
 const onScPaxChange = (value) => {
 	const total = normalizedTotalPax.value;
@@ -366,9 +456,10 @@ const onScPaxChange = (value) => {
 
 const syncMetaToStore = () => {
 	invoiceStore.mergeInvoiceDoc({
+		// NOTE: backend schema is single-field; we squash patron info into strings
 		custom_special_discount_type: selectedDiscountType.value,
-		custom_special_discount_name: discountName.value,
-		custom_special_discount_id_number: discountID.value,
+		custom_special_discount_name: formattedNames.value,
+		custom_special_discount_id_number: formattedIDs.value,
 		custom_total_pax: normalizedTotalPax.value,
 		custom_sc_pwd_pax: isScPwdType.value ? effectiveScPax.value : 0,
 	});
@@ -395,8 +486,8 @@ const handleSave = () => {
 
 	const patched = applyPhScPwdDiscountToDoc(currentDoc, original, breakdown, {
 		discountType: selectedDiscountType.value,
-		name: discountName.value.trim(),
-		idNumber: discountID.value.trim(),
+		name: formattedNames.value.trim(),
+		idNumber: formattedIDs.value.trim(),
 		totalPax: normalizedTotalPax.value,
 		scPax: effectiveScPax.value,
 	});
@@ -421,8 +512,7 @@ const handleClear = () => {
 	invoiceStore.setInvoiceDoc(cleared);
 
 	selectedDiscountType.value = "";
-	discountName.value = "";
-	discountID.value = "";
+	discountPatrons.value = [];
 	isApplied.value = false;
 	appliedScDiscount.value = 0;
 	appliedVatExempt.value = 0;
@@ -434,11 +524,15 @@ const handleClear = () => {
 	eventBus?.emit?.("payment_invoice_totals_updated");
 };
 
-watch(discountName, (newVal) => {
-	discountName.value = capitalize(newVal).trim();
-	syncMetaToStore();
-});
-watch(discountID, syncMetaToStore);
+watch(
+	() => props.invoiceDoc?.custom_special_discount_name,
+	() => {
+		const existing = parseExistingPatrons(props.invoiceDoc);
+		if (!existing) return;
+		discountPatrons.value = existing;
+	},
+	{ immediate: true },
+);
 </script>
 
 <style scoped>
@@ -476,5 +570,30 @@ watch(discountID, syncMetaToStore);
 .discount-preview__row--total {
 	padding-top: 4px;
 	border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.patrons {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.patron-card {
+	padding: 8px 10px;
+	border-radius: 8px;
+	background: rgba(var(--v-theme-surface-variant), 0.22);
+	border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.patron-card--stacked {
+	background: rgba(var(--v-theme-surface-variant), 0.28);
+}
+
+.patron-card__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 4px;
+	color: rgba(255, 255, 255, 0.82);
 }
 </style>

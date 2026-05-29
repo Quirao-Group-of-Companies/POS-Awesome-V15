@@ -150,7 +150,7 @@ function finalizeBreakdown(
 
 /** 5% service charge: regular pax on VAT-inclusive share; SC/PWD pax on VAT-exclusive share. */
 export function computePhServiceCharge(
-	originalGrandTotal: number,
+	baseAmount: number,
 	totalPax: number,
 	scPax: number,
 ): number {
@@ -158,7 +158,7 @@ export function computePhServiceCharge(
 	const senior = Math.max(0, Math.min(total, Math.floor(Number(scPax) || 0)));
 	const regular = Math.max(0, total - senior);
 
-	const sharedPerPerson = (Number(originalGrandTotal) || 0) / total;
+	const sharedPerPerson = (Number(baseAmount) || 0) / total;
 
 	const regularBase = sharedPerPerson * regular;
 	const regularSC = regularBase * 0.05;
@@ -168,6 +168,57 @@ export function computePhServiceCharge(
 	const seniorSC = seniorVatExemptBase * 0.05;
 
 	return round2(regularSC + seniorSC);
+}
+
+export type DiscountSplit = {
+	seniorAmount: number;
+	pwdAmount: number;
+};
+
+/** Split total discount proportionally by patron type (Senior Citizen vs PWD) with safe rounding. */
+export function splitDiscountByPatronType(
+	totalDiscount: number,
+	patrons: Array<{ type?: string }>,
+): DiscountSplit {
+	const absDiscount = Math.abs(Number(totalDiscount) || 0);
+	if (absDiscount <= 0) {
+		return { seniorAmount: 0, pwdAmount: 0 };
+	}
+
+	const patronsArr = Array.isArray(patrons) ? patrons : [];
+	const seniorCount = patronsArr.filter(
+		(p) => String(p?.type || "").trim() === "Senior Citizen",
+	).length;
+	const pwdCount = patronsArr.filter(
+		(p) => String(p?.type || "").trim() === "PWD",
+	).length;
+
+	if (seniorCount === 0 && pwdCount === 0) {
+		return { seniorAmount: round2(absDiscount), pwdAmount: 0 };
+	}
+	if (seniorCount === 0) {
+		return { seniorAmount: 0, pwdAmount: round2(absDiscount) };
+	}
+	if (pwdCount === 0) {
+		return { seniorAmount: round2(absDiscount), pwdAmount: 0 };
+	}
+
+	const totalPax = seniorCount + pwdCount;
+	const perPax = absDiscount / totalPax;
+
+	let pwdAmount = round2(perPax * pwdCount);
+	let seniorAmount = round2(absDiscount - pwdAmount);
+
+	const sum = round2(pwdAmount + seniorAmount);
+	if (Math.abs(sum - round2(absDiscount)) > 0.01) {
+		if (pwdAmount >= seniorAmount) {
+			pwdAmount = round2(pwdAmount + round2(absDiscount) - sum);
+		} else {
+			seniorAmount = round2(seniorAmount + round2(absDiscount) - sum);
+		}
+	}
+
+	return { seniorAmount, pwdAmount };
 }
 
 export function captureOriginalTotals(doc: Record<string, unknown> | null | undefined): PhScPwdOriginalTotals {
@@ -228,8 +279,6 @@ export function applyPhScPwdDiscountToDoc(
 		),
 		total: round2(original.total - totalDeduction + serviceCharge),
 		grand_total: round2(original.grand_total - totalDeduction + serviceCharge),
-		discount_amount: totalDeduction,
-		apply_discount_on: "Grand Total",
 	};
 }
 

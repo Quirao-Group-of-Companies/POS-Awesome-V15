@@ -50,24 +50,26 @@
 						</div>
 						<PaymentMethods
 							:payments="visiblePaymentMethods"
-							:currency="invoice_doc.currency"
-							:isReturn="invoice_doc.is_return"
-							:requestPaymentField="request_payment_field"
-							:currencySymbol="currencySymbol"
-							:formatCurrency="formatCurrency"
-							:isNumber="isNumber"
-							:getVisibleDenominations="getVisibleDenominations"
-							:isCashLikePayment="isCashLikePayment"
-							:isMpesaC2bPayment="is_mpesa_c2b_payment"
-							:isGiftCardPayment="isGiftCardPayment"
+							:currency="displayCurrency"
+							:grand-total="netInvoiceSettlementAmount"
+							:total="invoice_doc?.total || 0"
+							:is-return="is_return"
+							:request-payment-field="requestPaymentField"
+							:currency-symbol="currencySymbol"
+							:format-currency="formatCurrency"
+							:is-number="isNumber"
+							:get-visible-denominations="getVisibleDenominations"
+							:is-cash-like-payment="isCashLikePayment"
+							:is-mpesa-c2b-payment="is_mpesa_c2b_payment"
+							:is-gift-card-payment="isGiftCardPayment"
 							@update-amount="handlePaymentAmountChange"
 							@set-full-amount="set_full_amount"
-							@set-denomination="setPaymentToDenomination"
+							@set-denomination="set_denomination"
 							@mpesa-dialog="mpesa_c2b_dialog"
 							@request-payment="request_payment"
-							@set-rest-amount="set_rest_amount"
-							@open-gift-card="openGiftCardDialog"
-							@update-card-detail="handleCardDetailUpdate"
+							@set-rest-amount="handleSetRestAmount"
+							@open-gift-card="handleOpenGiftCard"
+							@update-card-detail="handleUpdateCardDetail"
 						/>
 						<PaymentGiftCardSection
 							:enabled="Boolean(pos_profile?.posa_use_gift_cards)"
@@ -1120,10 +1122,6 @@ const syncPreferredPaymentToCurrentTotal = (doc = invoice_doc.value) => {
 		return preferredPayment;
 	}
 
-	const total = netInvoiceSettlementAmount.value;
-	const normalizedTotal = doc.is_return ? -Math.abs(total) : Math.abs(total);
-	const conversionRate = flt(doc.conversion_rate || 1, currency_precision.value);
-
 	payments.forEach((payment) => {
 		if (payment !== preferredPayment) {
 			payment.amount = 0;
@@ -1132,11 +1130,6 @@ const syncPreferredPaymentToCurrentTotal = (doc = invoice_doc.value) => {
 			}
 		}
 	});
-
-	preferredPayment.amount = normalizedTotal;
-	if (preferredPayment.base_amount !== undefined) {
-		preferredPayment.base_amount = flt(normalizedTotal * conversionRate, currency_precision.value);
-	}
 
 	return preferredPayment;
 };

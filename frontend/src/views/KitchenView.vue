@@ -114,10 +114,22 @@
 				</ul>
 
 				<footer class="kitchen-order-card__footer">
-					<span>
+					<span class="kitchen-order-card__footer-count">
 						{{ servedCount(order) }} / {{ order.items.length }}
 						{{ __("served") }}
 					</span>
+					<v-btn
+						v-if="!isOrderComplete(order)"
+						variant="text"
+						size="small"
+						color="success"
+						class="kitchen-order-card__serve-all"
+						:loading="isServingAll(order.name)"
+						:disabled="isServingAll(order.name) || !kitchenServedFieldReady"
+						@click="serveAllItems(order)"
+					>
+						{{ __("Serve All") }}
+					</v-btn>
 				</footer>
 			</article>
 		</transition-group>
@@ -157,6 +169,7 @@ const sessionReady = ref(false);
 const nowTick = ref(Date.now());
 const dismissingOrderNames = ref(new Set());
 const dismissedOrderNames = ref(new Set());
+const servingAllOrderNames = ref(new Set());
 
 let pollTimer = null;
 let elapsedTimer = null;
@@ -263,6 +276,30 @@ const isOrderComplete = (order) => {
 };
 
 const isOrderDismissing = (orderName) => dismissingOrderNames.value.has(orderName);
+
+const isServingAll = (orderName) => servingAllOrderNames.value.has(orderName);
+
+const isItemServed = (item) => Boolean(Number(item?.custom_kitchen_served));
+
+const setKitchenServedValue = (lineDoctype, itemName, value) => {
+	if (frappe?.db?.set_value) {
+		return frappe.db.set_value(lineDoctype, itemName, "custom_kitchen_served", value);
+	}
+
+	return new Promise((resolve, reject) => {
+		frappe.call({
+			method: "frappe.client.set_value",
+			args: {
+				doctype: lineDoctype,
+				name: itemName,
+				fieldname: "custom_kitchen_served",
+				value,
+			},
+			callback: () => resolve(true),
+			error: reject,
+		});
+	});
+};
 
 const clearDismissTimer = (orderName) => {
 	const existing = dismissTimers.get(orderName);
@@ -384,7 +421,74 @@ const fetchOrders = async ({ silent = false } = {}) => {
 	}
 };
 
+const serveAllItems = async (order) => {
+	if (!kitchenServedFieldReady.value) {
+		frappe?.show_alert?.({
+			message: __("Run bench migrate to enable kitchen checkboxes."),
+			indicator: "orange",
+		});
+		return;
+	}
+
+	if (!order?.items?.length || isServingAll(order.name)) {
+		return;
+	}
+
+	const unserved = (order.items || []).filter((item) => item?.name && !isItemServed(item));
+	if (!unserved.length) {
+		maybeDismissCompletedOrder(order);
+		return;
+	}
+
+	servingAllOrderNames.value = new Set([...servingAllOrderNames.value, order.name]);
+
+	for (const item of unserved) {
+		item.custom_kitchen_served = 1;
+		item._saving = true;
+	}
+
+	const lineDoctype = itemDoctype.value || "POS Invoice Item";
+
+	try {
+		const results = await Promise.allSettled(
+			unserved.map((item) => setKitchenServedValue(lineDoctype, item.name, 1)),
+		);
+
+		const failed = unserved.filter((_, index) => results[index].status === "rejected");
+		if (failed.length) {
+			for (const item of failed) {
+				item.custom_kitchen_served = 0;
+			}
+			errorMessage.value = __("Some items could not be marked as served. Please try again.");
+			frappe?.show_alert?.({
+				message: __("Could not serve all items"),
+				indicator: "red",
+			});
+		}
+
+		maybeDismissCompletedOrder(order);
+	} catch (error) {
+		console.error("Kitchen serve-all failed", error);
+		for (const item of unserved) {
+			item.custom_kitchen_served = 0;
+		}
+		errorMessage.value = __("Could not mark all items as served. Please try again.");
+	} finally {
+		for (const item of unserved) {
+			item._saving = false;
+		}
+
+		const next = new Set(servingAllOrderNames.value);
+		next.delete(order.name);
+		servingAllOrderNames.value = next;
+	}
+};
+
 const toggleItemServed = async (order, item, checked) => {
+	if (isServingAll(order?.name)) {
+		return;
+	}
+
 	if (!kitchenServedFieldReady.value) {
 		frappe?.show_alert?.({
 			message: __("Run bench migrate to enable kitchen checkboxes."),
@@ -406,19 +510,7 @@ const toggleItemServed = async (order, item, checked) => {
 	try {
 		const lineDoctype = itemDoctype.value || "POS Invoice Item";
 
-		await new Promise((resolve, reject) => {
-			frappe.call({
-				method: "frappe.client.set_value",
-				args: {
-					doctype: lineDoctype,
-					name: item.name,
-					fieldname: "custom_kitchen_served",
-					value: nextValue,
-				},
-				callback: () => resolve(true),
-				error: reject,
-			});
-		});
+		await setKitchenServedValue(lineDoctype, item.name, nextValue);
 
 		maybeDismissCompletedOrder(order);
 	} catch (error) {
@@ -680,9 +772,24 @@ onBeforeUnmount(() => {
 }
 
 .kitchen-order-card__footer {
-	padding: 8px 16px 12px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 12px 12px 16px;
 	font-size: 0.85rem;
-	opacity: 0.75;
+	opacity: 0.85;
+}
+
+.kitchen-order-card__footer-count {
+	flex: 1;
+	min-width: 0;
+}
+
+.kitchen-order-card__serve-all {
+	flex-shrink: 0;
+	text-transform: none;
+	letter-spacing: 0.01em;
 }
 
 .kitchen-card-fade-enter-active,

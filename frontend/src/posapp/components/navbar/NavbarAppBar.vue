@@ -118,6 +118,21 @@
 				</span>
 			</v-btn>
 
+			<v-btn
+				v-if="showKitchenDisplay"
+				variant="flat"
+				color="warning"
+				:size="isMobile ? 'small' : 'default'"
+				class="pos-kitchen-display-btn"
+				prepend-icon="mdi-silverware-fork-knife"
+				:aria-label="__('Open kitchen display')"
+				@click="goToKitchen"
+			>
+				<span class="pos-kitchen-display-btn__label">
+					{{ isMobile ? __("Kitchen") : __("Kitchen Display") }}
+				</span>
+			</v-btn>
+
 			<!-- Mobile: Show only essential items, others in menu -->
 			<template v-if="isMobile">
 				<!-- Always visible status indicator -->
@@ -392,11 +407,19 @@ export default {
 			router.push({ path: "/tables" });
 		};
 
+		const showKitchenDisplay = computed(() => route.path !== "/kitchen");
+
+		const goToKitchen = () => {
+			router.push({ path: "/kitchen" });
+		};
+
 		return {
 			isRtl,
 			rtlStyles,
 			rtlClasses,
 			posLogoFallback: posLogo,
+			showKitchenDisplay,
+			goToKitchen,
 			showBackToTables,
 			goBackToTables,
 			tableContext,

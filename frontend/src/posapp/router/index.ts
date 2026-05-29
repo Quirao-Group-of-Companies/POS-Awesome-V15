@@ -112,6 +112,15 @@ const routes = [
 		},
 	},
 	{
+		path: "/kitchen",
+		component: () => import("../../views/KitchenView.vue"),
+		meta: {
+			title: "Kitchen Display",
+			layout: "display",
+			loadingMessage: "Loading kitchen display...",
+		},
+	},
+	{
 		path: "/offline-route-unavailable",
 		name: OFFLINE_ROUTE_UNAVAILABLE_NAME,
 		component: OfflineRouteUnavailable,

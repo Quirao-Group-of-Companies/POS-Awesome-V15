@@ -302,6 +302,11 @@ export default {
 			baseItems: [
 				{ text: "POS", icon: "mdi-network-pos", to: "/pos" },
 				{ text: "Payments", icon: "mdi-credit-card", to: "/payments" },
+				{
+					text: "Kitchen Display",
+					icon: "mdi-silverware-fork-knife",
+					to: "/kitchen",
+				},
 				{ text: "Purchase Order", icon: "mdi-cart-plus", to: "/orders" },
 				{ text: "Barcode Printing", icon: "mdi-barcode", to: "/barcode" },
 			],
@@ -420,6 +425,13 @@ export default {
 					tone: "primary",
 				});
 			}
+			terminalActions.push({
+				id: "open-kitchen-display",
+				label: this.__("Open Kitchen Display"),
+				subtitle: this.__("View and mark open kitchen orders"),
+				icon: "mdi-silverware-fork-knife",
+				tone: "warning",
+			});
 
 			const personalActions = [
 				{
@@ -743,6 +755,10 @@ export default {
 				case "open-customer-display":
 					this.closeSettingsPanel();
 					this.$emit("open-customer-display");
+					break;
+				case "open-kitchen-display":
+					this.closeSettingsPanel();
+					this.$router.push({ path: "/kitchen" });
 					break;
 				case "toggle-theme":
 					this.closeSettingsPanel();

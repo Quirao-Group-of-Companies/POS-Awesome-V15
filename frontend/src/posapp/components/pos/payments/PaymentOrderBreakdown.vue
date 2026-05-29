@@ -46,11 +46,8 @@
 							<div class="font-weight-bold">
 								{{ row.item?.item_name || row.item?.item_code || __("Item") }}
 							</div>
-							<div
-								v-if="isScPwdDiscountActive && getItemVatExemption(row.item) > 0"
-								class="text-caption text-medium-emphasis pl-2"
-							>
-								Less VAT(12%): {{ getItemVatExemption(row.item) }}
+							<div class="text-caption text-medium-emphasis pl-2 payment-order-breakdown__vat-subline">
+								{{ __("VAT (12%)") }}: {{ row.vatDisplay }}
 							</div>
 						</td>
 						<td
@@ -115,45 +112,21 @@ const resolveLineAmount = (item) => {
 	return flt(item?.qty) * flt(item?.rate);
 };
 
-const specialDiscountType = computed(() =>
-	String(props.invoiceDoc?.custom_special_discount_type || "").trim(),
-);
-
-const isScPwdDiscountActive = computed(() => {
-	const type = specialDiscountType.value;
-	if (type !== "Senior Citizen" && type !== "PWD") return false;
-	const sc = Math.floor(flt(props.invoiceDoc?.custom_sc_pwd_pax ?? 0));
-	return sc > 0;
-});
-
-const getPaxRatio = () => {
-	const doc = props.invoiceDoc;
-	const total = Math.max(
-		1,
-		Math.floor(flt(doc?.custom_total_pax ?? doc?.custom_customer_count ?? 1)),
-	);
-	const sc = Math.max(0, Math.min(total, Math.floor(flt(doc?.custom_sc_pwd_pax ?? 0))));
-	return sc > 0 ? sc / total : 0;
-};
-
-function getItemVatExemption(item) {
-	if (!isScPwdDiscountActive.value) return 0;
-
-	const ratio = getPaxRatio();
-	if (!ratio) return 0;
-
-	const grossAmount = resolveLineAmount(item);
-	if (!grossAmount) return 0;
-
-	const seniorShare = grossAmount * ratio;
-	// Equivalent to: (seniorShare / 1.12) * 0.12
-	const vatExempt = seniorShare - seniorShare / 1.12;
-	return formatVat(vatExempt);
-}
-
 function formatVat(value) {
 	const num = flt(value);
 	return num.toFixed(2);
+}
+
+function getItemVatNumeric(item) {
+	const grossAmount = resolveLineAmount(item);
+	if (!grossAmount) return 0;
+
+	// Extract the 12% inclusive VAT component
+	return flt(grossAmount - grossAmount / 1.12);
+}
+
+function getItemVatAmount(item) {
+	return formatVat(getItemVatNumeric(item));
 }
 
 const resolveLineKey = (item, index) => {
@@ -180,6 +153,7 @@ const orderLines = computed(() => {
 				item,
 				qtyDisplay: formatQty(qty),
 				amountDisplay: props.formatCurrency(amount, currency),
+				vatDisplay: props.formatCurrency(getItemVatNumeric(item), currency),
 			};
 		});
 });
@@ -255,6 +229,13 @@ function formatQty(qty) {
 	white-space: normal;
 	word-break: break-word;
 	color: var(--pos-text-primary, #fff);
+}
+
+.payment-order-breakdown__vat-subline {
+	display: block;
+	margin-top: 2px;
+	line-height: 1.25;
+	opacity: 0.82;
 }
 
 .payment-order-breakdown__qty-col {

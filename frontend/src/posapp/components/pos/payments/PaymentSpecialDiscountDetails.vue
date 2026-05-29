@@ -109,20 +109,36 @@
 			</v-col>
 
 			<v-col
-				v-if="isDiscountEligible && isScPwdType && scPwdBreakdown.totalDiscount > 0"
+				v-if="calculatedServiceCharge > 0 || (isDiscountEligible && isScPwdType && scPwdBreakdown.totalDeduction > 0)"
 				cols="12"
 				class="pt-0"
 			>
 				<div class="discount-preview text-caption">
-					<div class="discount-preview__row">
+					<div
+						v-if="uiStore.posProfile?.custom_enable_service_charge === 1 && calculatedServiceCharge > 0"
+						class="discount-preview__row"
+					>
+						<span>{{ __("Service Charge (5%)") }}</span>
+						<strong>{{ formatMoney(calculatedServiceCharge) }}</strong>
+					</div>
+					<div
+						v-if="isScPwdType && scPwdBreakdown.vatExempt > 0"
+						class="discount-preview__row"
+					>
 						<span>{{ __("VAT Exemption") }}</span>
 						<strong>{{ formatMoney(scPwdBreakdown.vatExempt) }}</strong>
 					</div>
-					<div class="discount-preview__row">
+					<div
+						v-if="isScPwdType && scPwdBreakdown.scDiscount > 0"
+						class="discount-preview__row"
+					>
 						<span>{{ __("20% SC/PWD Discount") }}</span>
 						<strong>{{ formatMoney(scPwdBreakdown.scDiscount) }}</strong>
 					</div>
-					<div class="discount-preview__row discount-preview__row--total">
+					<div
+						v-if="isScPwdType && scPwdBreakdown.totalDeduction > 0"
+						class="discount-preview__row discount-preview__row--total"
+					>
 						<span>{{ __("Total deduction") }}</span>
 						<strong>{{ formatMoney(scPwdBreakdown.totalDeduction) }}</strong>
 					</div>
@@ -173,14 +189,15 @@
 <script setup>
 import { ref, computed, watch, getCurrentInstance, onMounted, onBeforeUnmount } from "vue";
 import { useInvoiceStore } from "../../../stores/invoiceStore.js";
+import { useUIStore } from "../../../stores/uiStore.js";
 import { useFormat } from "../../../format.ts";
-import { capitalize } from "lodash";
 import {
 	applyPhScPwdDiscountToDoc,
 	captureOriginalTotals,
 	clearPhScPwdDiscountFromDoc,
 	computePhScPwdBreakdownFromGrandTotal,
 	computePhScPwdBreakdownFromItems,
+	computePhServiceCharge,
 	resolveTotalPaxFromDoc,
 	round2,
 } from "../../../utils/phScPwdDiscount.ts";
@@ -190,6 +207,7 @@ const props = defineProps({
 });
 
 const invoiceStore = useInvoiceStore();
+const uiStore = useUIStore();
 const { formatCurrency, currencySymbol } = useFormat();
 const instance = getCurrentInstance();
 const eventBus = instance?.proxy?.eventBus;
@@ -297,6 +315,25 @@ watch(
 	{ immediate: true },
 );
 
+const calculatedServiceCharge = computed(() => {
+	const isScEnabled = uiStore.posProfile?.custom_enable_service_charge === 1;
+
+	if (!isScEnabled) {
+		return 0;
+	}
+
+	const total = Math.max(1, Math.floor(Number(localTotalPax.value || 1)));
+	const senior = isScPwdType.value
+		? Math.max(0, Math.min(total, Math.floor(Number(localScPax.value || 0))))
+		: 0;
+
+	return computePhServiceCharge(
+		originalValues.value.grand_total || 0,
+		total,
+		senior,
+	);
+});
+
 const scPwdBreakdown = computed(() => {
 	if (!isScPwdType.value) {
 		return computePhScPwdBreakdownFromGrandTotal(0, 1, 0);
@@ -331,6 +368,33 @@ const isDiscountEligible = computed(
 			(p) => String(p?.name || "").trim() && String(p?.id || "").trim(),
 		),
 );
+
+const totalDiscount = computed(() =>
+	isApplied.value ? Number(scPwdBreakdown.value.scDiscount || 0) : 0,
+);
+
+const calculatedVatExemption = computed(() =>
+	isApplied.value ? Number(scPwdBreakdown.value.vatExempt || 0) : 0,
+);
+
+const discountedTotals = computed(() => {
+	const discount = Number(totalDiscount.value || 0);
+	const vatExempt = Number(calculatedVatExemption.value || 0);
+	const serviceCharge = Number(calculatedServiceCharge.value || 0);
+
+	return {
+		net_total: parseFloat((originalValues.value.net_total - discount).toFixed(2)),
+		total_taxes_and_charges: parseFloat(
+			(originalValues.value.total_taxes_and_charges - vatExempt + serviceCharge).toFixed(
+				2,
+			),
+		),
+		total: parseFloat((originalValues.value.total - discount - vatExempt).toFixed(2)),
+		grand_total: parseFloat(
+			(originalValues.value.grand_total - discount - vatExempt + serviceCharge).toFixed(2),
+		),
+	};
+});
 
 const formatMoney = (value) => {
 	const currency = props.invoiceDoc?.currency || "";
@@ -447,14 +511,61 @@ watch(
 	{ immediate: true },
 );
 
-const syncMetaToStore = () => {
-	invoiceStore.mergeInvoiceDoc({
+const applyDiscountedTotalsToStore = () => {
+	if (saving.value) return;
+
+	const original = originalValues.value;
+	const baseGrand = Number(original?.grand_total || 0);
+	const docGrand = Number(props.invoiceDoc?.grand_total || invoiceStore.invoiceDoc?.grand_total || 0);
+	if (!baseGrand && !docGrand) return;
+
+	const totals = discountedTotals.value;
+	const serviceCharge = calculatedServiceCharge.value;
+	const currentDoc = { ...(invoiceStore.invoiceDoc || props.invoiceDoc || {}) };
+	const payments = syncPaymentsToGrandTotal(
+		{ ...currentDoc, grand_total: totals.grand_total },
+		totals.grand_total,
+	);
+
+	const patch = {
 		custom_special_discount_type: selectedDiscountType.value,
 		custom_special_discount_details: childTableData.value,
 		custom_total_pax: normalizedTotalPax.value,
 		custom_sc_pwd_pax: isScPwdType.value ? effectiveScPax.value : 0,
-	});
+		custom_service_charge_amount: serviceCharge,
+		posa_service_charge: serviceCharge,
+		net_total: totals.net_total,
+		total: totals.total,
+		total_taxes_and_charges: totals.total_taxes_and_charges,
+		grand_total: totals.grand_total,
+		payments,
+	};
+
+	if (
+		currentDoc.custom_original_grand_total == null ||
+		currentDoc.custom_original_grand_total === ""
+	) {
+		patch.custom_original_net_total = original.net_total;
+		patch.custom_original_total = original.total;
+		patch.custom_original_grand_total = original.grand_total;
+		patch.custom_original_total_taxes_and_charges = original.total_taxes_and_charges;
+	}
+
+	invoiceStore.mergeInvoiceDoc(patch);
+	eventBus?.emit?.("payment_invoice_totals_updated");
 };
+
+const syncMetaToStore = () => {
+	applyDiscountedTotalsToStore();
+};
+
+watch(
+	discountedTotals,
+	() => {
+		applyDiscountedTotalsToStore();
+	},
+	{ deep: true, immediate: true },
+);
 
 const handleSave = () => {
 	if (!isDiscountEligible.value) return;
@@ -475,12 +586,22 @@ const handleSave = () => {
 	const original = captureOriginalTotals(currentDoc);
 	originalValues.value = original;
 
+	const totals = discountedTotals.value;
+	const serviceCharge = calculatedServiceCharge.value;
+
 	const patched = applyPhScPwdDiscountToDoc(currentDoc, original, breakdown, {
 		discountType: selectedDiscountType.value,
 		totalPax: normalizedTotalPax.value,
 		scPax: effectiveScPax.value,
+		serviceCharge,
 	});
 
+	patched.net_total = totals.net_total;
+	patched.total = totals.total;
+	patched.total_taxes_and_charges = totals.total_taxes_and_charges;
+	patched.grand_total = totals.grand_total;
+	patched.custom_service_charge_amount = serviceCharge;
+	patched.posa_service_charge = serviceCharge;
 	patched.payments = syncPaymentsToGrandTotal(patched, patched.grand_total);
 	invoiceStore.setInvoiceDoc(patched);
 
@@ -510,8 +631,7 @@ const handleClear = () => {
 	userAdjustedTotalPax.value = false;
 	originalValues.value = original;
 	syncTotalPaxFromCustomerCount(cleared, { force: true });
-
-	eventBus?.emit?.("payment_invoice_totals_updated");
+	applyDiscountedTotalsToStore();
 };
 
 watch(

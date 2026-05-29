@@ -148,6 +148,28 @@ function finalizeBreakdown(
 	};
 }
 
+/** 5% service charge: regular pax on VAT-inclusive share; SC/PWD pax on VAT-exclusive share. */
+export function computePhServiceCharge(
+	originalGrandTotal: number,
+	totalPax: number,
+	scPax: number,
+): number {
+	const total = Math.max(1, Math.floor(Number(totalPax) || 1));
+	const senior = Math.max(0, Math.min(total, Math.floor(Number(scPax) || 0)));
+	const regular = Math.max(0, total - senior);
+
+	const sharedPerPerson = (Number(originalGrandTotal) || 0) / total;
+
+	const regularBase = sharedPerPerson * regular;
+	const regularSC = regularBase * 0.05;
+
+	const seniorGrossShare = sharedPerPerson * senior;
+	const seniorVatExemptBase = seniorGrossShare / 1.12;
+	const seniorSC = seniorVatExemptBase * 0.05;
+
+	return round2(regularSC + seniorSC);
+}
+
 export function captureOriginalTotals(doc: Record<string, unknown> | null | undefined): PhScPwdOriginalTotals {
 	if (!doc) {
 		return { net_total: 0, total: 0, grand_total: 0, total_taxes_and_charges: 0 };
@@ -180,9 +202,11 @@ export function applyPhScPwdDiscountToDoc(
 		discountType: string;
 		totalPax: number;
 		scPax: number;
+		serviceCharge?: number;
 	},
 ): Record<string, any> {
 	const { scDiscount, vatExempt, totalDeduction } = breakdown;
+	const serviceCharge = round2(meta.serviceCharge || 0);
 
 	return {
 		...doc,
@@ -196,10 +220,14 @@ export function applyPhScPwdDiscountToDoc(
 		custom_sc_pwd_pax: meta.scPax,
 		custom_sc_discount_amount: scDiscount,
 		custom_vat_exempt_amount: vatExempt,
+		custom_service_charge_amount: serviceCharge,
+		posa_service_charge: serviceCharge,
 		net_total: round2(original.net_total - scDiscount),
-		total_taxes_and_charges: round2(original.total_taxes_and_charges - vatExempt),
-		total: round2(original.total - totalDeduction),
-		grand_total: round2(original.grand_total - totalDeduction),
+		total_taxes_and_charges: round2(
+			original.total_taxes_and_charges - vatExempt + serviceCharge,
+		),
+		total: round2(original.total - totalDeduction + serviceCharge),
+		grand_total: round2(original.grand_total - totalDeduction + serviceCharge),
 		discount_amount: totalDeduction,
 		apply_discount_on: "Grand Total",
 	};
@@ -216,6 +244,8 @@ export function clearPhScPwdDiscountFromDoc(
 		custom_sc_discount_amount: 0,
 		custom_vat_exempt_amount: 0,
 		custom_sc_pwd_pax: 0,
+		custom_service_charge_amount: 0,
+		posa_service_charge: 0,
 		net_total: original.net_total,
 		total: original.total,
 		total_taxes_and_charges: original.total_taxes_and_charges,

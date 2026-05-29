@@ -193,6 +193,7 @@ import {
 	computePhServiceCharge,
 	resolveTotalPaxFromDoc,
 	round2,
+	splitDiscountByPatronType,
 } from "../../../utils/phScPwdDiscount.ts";
 
 const props = defineProps({
@@ -228,6 +229,56 @@ const extractServiceChargeFromDoc = (doc) => {
 	if (!doc || !Array.isArray(doc.taxes)) return 0;
 	const scRow = doc.taxes.find((t) => isServiceChargeTaxRow(t));
 	return round2(scRow?.tax_amount || 0);
+};
+
+const isSpecialDiscountTaxRow = (tax) =>
+	tax?.charge_type === "Actual" &&
+	(typeof tax?.description === "string"
+		? tax.description === "Special Discount"
+		: false);
+
+const buildDiscountTaxRows = () => {
+	const rows = [];
+	if (
+		!isApplied.value ||
+		totalDiscount.value <= 0 ||
+		!Array.isArray(discountPatrons.value) ||
+		discountPatrons.value.length === 0
+	) {
+		return rows;
+	}
+
+	const split = splitDiscountByPatronType(
+		totalDiscount.value,
+		discountPatrons.value,
+	);
+	const scAccount =
+		uiStore.companyDoc?.custom_default_senior_citizen_account;
+	const pwdAccount = uiStore.companyDoc?.custom_default_pwd_account;
+
+	if (split.seniorAmount > 0 && scAccount) {
+		rows.push({
+			charge_type: "Actual",
+			account_head: scAccount,
+			description: "Special Discount",
+			tax_amount: -split.seniorAmount,
+			base_tax_amount: -split.seniorAmount,
+			rate: 0,
+			included_in_print_rate: 0,
+		});
+	}
+	if (split.pwdAmount > 0 && pwdAccount) {
+		rows.push({
+			charge_type: "Actual",
+			account_head: pwdAccount,
+			description: "Special Discount",
+			tax_amount: -split.pwdAmount,
+			base_tax_amount: -split.pwdAmount,
+			rate: 0,
+			included_in_print_rate: 0,
+		});
+	}
+	return rows;
 };
 
 const localTotalPax = ref(1);
@@ -551,6 +602,14 @@ watch(
 			});
 		}
 
+		// --- Discount tax rows (per-type split) ---
+		const taxesWithoutDiscount = updatedTaxes.filter(
+			(t) => !isSpecialDiscountTaxRow(t),
+		);
+		const newDiscountRows = buildDiscountTaxRows();
+		newDiscountRows.forEach((row) => taxesWithoutDiscount.push(row));
+		updatedTaxes.splice(0, updatedTaxes.length, ...taxesWithoutDiscount);
+
 		// 2. Calculate final totals (replace flat SC with prorated SC)
 		const finalTaxes = parseFloat((adjustedBaseTaxes + serviceCharge - vatExempt).toFixed(2));
 		const finalGrandTotal = parseFloat(
@@ -704,6 +763,43 @@ const handleSave = () => {
 	patched.custom_service_charge_amount = serviceCharge;
 	patched.posa_service_charge = serviceCharge;
 	patched.discount_amount = 0;
+
+	// --- Discount tax rows (per-type split) ---
+	const hasDiscount = breakdown.scDiscount > 0;
+	const existingTaxes = Array.isArray(patched.taxes)
+		? patched.taxes.map((t) => ({ ...t }))
+		: [];
+	const baseTaxes = existingTaxes.filter((t) => !isSpecialDiscountTaxRow(t));
+	if (hasDiscount && Array.isArray(discountPatrons.value) && discountPatrons.value.length > 0) {
+		const split = splitDiscountByPatronType(breakdown.scDiscount, discountPatrons.value);
+		const scAccount = uiStore.companyDoc?.custom_default_senior_citizen_account;
+		const pwdAccount = uiStore.companyDoc?.custom_default_pwd_account;
+
+		if (split.seniorAmount > 0 && scAccount) {
+			baseTaxes.push({
+				charge_type: "Actual",
+				account_head: scAccount,
+				description: "Special Discount",
+				tax_amount: -split.seniorAmount,
+				base_tax_amount: -split.seniorAmount,
+				rate: 0,
+				included_in_print_rate: 0,
+			});
+		}
+		if (split.pwdAmount > 0 && pwdAccount) {
+			baseTaxes.push({
+				charge_type: "Actual",
+				account_head: pwdAccount,
+				description: "Special Discount",
+				tax_amount: -split.pwdAmount,
+				base_tax_amount: -split.pwdAmount,
+				rate: 0,
+				included_in_print_rate: 0,
+			});
+		}
+	}
+	patched.taxes = baseTaxes;
+
 	patched.payments = syncPaymentsToGrandTotal(patched, patched.grand_total);
 	invoiceStore.setInvoiceDoc(patched);
 
@@ -719,9 +815,14 @@ const handleClear = () => {
 	const currentDoc = { ...(invoiceStore.invoiceDoc || props.invoiceDoc || {}) };
 	const original = captureOriginalTotals(currentDoc);
 	const cleared = clearPhScPwdDiscountFromDoc(currentDoc, original);
-	cleared.payments = syncPaymentsToGrandTotal(cleared, cleared.grand_total);
 	cleared.custom_special_discount_details = [];
 
+	// Remove discount tax rows
+	if (Array.isArray(cleared.taxes)) {
+		cleared.taxes = cleared.taxes.filter((t) => !isSpecialDiscountTaxRow(t));
+	}
+
+	cleared.payments = syncPaymentsToGrandTotal(cleared, cleared.grand_total);
 	invoiceStore.setInvoiceDoc(cleared);
 
 	selectedDiscountType.value = "";

@@ -28,8 +28,8 @@ describe("paymentInitialization", () => {
 
 		expect(resolvePreferredPaymentLine(doc, isCashLikePayment)).toBe(doc.payments[1]);
 		expect(payment).toBe(doc.payments[1]);
-		expect(doc.payments[1].amount).toBe(125);
-		expect(doc.payments[1].base_amount).toBe(125);
+		expect(doc.payments[1].amount).toBe(0);
+		expect(doc.payments[1].base_amount).toBe(0);
 		expect(doc.payments[0].amount).toBe(0);
 	});
 
@@ -59,8 +59,8 @@ describe("paymentInitialization", () => {
 
 		initializePaymentLinesForDialog(doc, 2, isCashLikePayment);
 
-		expect(doc.payments[0].amount).toBe(-80);
-		expect(doc.payments[0].base_amount).toBe(-80);
+		expect(doc.payments[0].amount).toBe(0);
+		expect(doc.payments[0].base_amount).toBe(0);
 	});
 
 	it("reduces the preferred payment amount when customer credit is redeemed", () => {

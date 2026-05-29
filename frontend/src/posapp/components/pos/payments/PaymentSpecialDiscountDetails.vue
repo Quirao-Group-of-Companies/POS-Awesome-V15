@@ -190,6 +190,7 @@ import {
 	clearPhScPwdDiscountFromDoc,
 	computePhScPwdBreakdownFromGrandTotal,
 	computePhScPwdBreakdownFromItems,
+	computePhServiceCharge,
 	resolveTotalPaxFromDoc,
 	round2,
 } from "../../../utils/phScPwdDiscount.ts";
@@ -213,6 +214,21 @@ const isApplied = ref(false);
 const appliedScDiscount = ref(0);
 const appliedVatExempt = ref(0);
 const originalValues = ref(captureOriginalTotals(null));
+const originalServiceCharge = ref(0);
+
+const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
+
+const isServiceChargeTaxRow = (tax) =>
+	tax?.charge_type === "Actual" &&
+	(typeof tax?.description === "string"
+		? tax.description.includes(SERVICE_CHARGE_TAX_DESCRIPTION)
+		: false);
+
+const extractServiceChargeFromDoc = (doc) => {
+	if (!doc || !Array.isArray(doc.taxes)) return 0;
+	const scRow = doc.taxes.find((t) => isServiceChargeTaxRow(t));
+	return round2(scRow?.tax_amount || 0);
+};
 
 const localTotalPax = ref(1);
 const localScPax = ref(1);
@@ -311,37 +327,24 @@ const resolveActivePosProfile = () =>
 	uiStore.posProfile || uiStore.profile || uiStore.pos_profile || {};
 
 const calculatedServiceCharge = computed(() => {
-	// Safely parse the checkbox flag (posProfile is the Pinia store field)
 	const profile = resolveActivePosProfile();
 	const isScEnabled = Number(profile.custom_enable_service_charge) === 1;
 	if (!isScEnabled) return 0;
 
-	const total = Math.max(1, Math.floor(Number(localTotalPax.value || 1)));
-	let senior = Math.max(0, Math.min(total, Math.floor(Number(localScPax.value || 0))));
-	if (!isScPwdType.value) {
-		senior = 0;
-	}
-	const regular = Math.max(0, total - senior);
+	const totalPax = Math.max(1, Math.floor(Number(localTotalPax.value || 1)));
+	const scPax = isScPwdType.value
+		? Math.max(0, Math.min(totalPax, Math.floor(Number(localScPax.value || 0))))
+		: 0;
 
-	// Fallback to current document grand total if originalValues is not yet populated
-	const baseGrandTotal =
-		originalValues.value.grand_total ||
-		invoiceStore.invoiceDoc?.custom_original_grand_total ||
-		invoiceStore.invoiceDoc?.grand_total ||
-		props.invoiceDoc?.grand_total ||
+	const baseAmount =
+		originalValues.value.net_total ||
+		invoiceStore.invoiceDoc?.custom_original_net_total ||
+		invoiceStore.invoiceDoc?.net_total ||
+		props.invoiceDoc?.net_total ||
 		0;
-	if (!baseGrandTotal) return 0;
+	if (!baseAmount) return 0;
 
-	const sharedPerPerson = baseGrandTotal / total;
-
-	const regularBase = sharedPerPerson * regular;
-	const regularSC = regularBase * 0.05;
-
-	const seniorGrossShare = sharedPerPerson * senior;
-	const seniorVatExemptBase = seniorGrossShare / 1.12;
-	const seniorSC = seniorVatExemptBase * 0.05;
-
-	return Number((regularSC + seniorSC).toFixed(2));
+	return computePhServiceCharge(baseAmount, totalPax, scPax);
 });
 
 const scPwdBreakdown = computed(() => {
@@ -395,14 +398,20 @@ const discountedTotals = computed(() => {
 	// Service Charge ALWAYS applies (if enabled in profile)
 	const serviceCharge = Number(calculatedServiceCharge.value || 0);
 
+	// Subtract original SC from base (it's already baked into the captured values)
+	// then add the new prorated SC — effectively replacing flat SC with prorated SC
+	const existingSC = originalServiceCharge.value;
+
 	return {
 		net_total: parseFloat((originalValues.value.net_total - discount).toFixed(2)),
 		total_taxes_and_charges: parseFloat(
-			(originalValues.value.total_taxes_and_charges - vatExempt + serviceCharge).toFixed(2),
+			(originalValues.value.total_taxes_and_charges - existingSC - vatExempt + serviceCharge).toFixed(2),
 		),
-		total: parseFloat((originalValues.value.total - discount - vatExempt).toFixed(2)),
+		total: parseFloat(
+			(originalValues.value.total - existingSC - discount - vatExempt + serviceCharge).toFixed(2),
+		),
 		grand_total: parseFloat(
-			(originalValues.value.grand_total - discount - vatExempt + serviceCharge).toFixed(2),
+			(originalValues.value.grand_total - existingSC - discount - vatExempt + serviceCharge).toFixed(2),
 		),
 	};
 });
@@ -471,6 +480,7 @@ onBeforeUnmount(() => {
 const refreshFromDoc = (doc) => {
 	if (!doc) return;
 	originalValues.value = captureOriginalTotals(doc);
+	originalServiceCharge.value = extractServiceChargeFromDoc(doc);
 	loadPaxFromDoc(doc);
 	const applied = round2(doc.custom_sc_discount_amount) > 0 || round2(doc.discount_amount) > 0;
 	isApplied.value = applied;
@@ -484,18 +494,10 @@ watch(
 	{ immediate: true },
 );
 
-const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
-
 const resolveServiceChargeAccountHead = () =>
 	uiStore.companyDoc?.default_service_charge_account ||
 	uiStore.posProfile?.default_service_charge_account ||
 	"Service Charge Payable";
-
-const isServiceChargeTaxRow = (tax) =>
-	tax?.charge_type === "Actual" &&
-	(typeof tax?.description === "string"
-		? tax.description.includes(SERVICE_CHARGE_TAX_DESCRIPTION)
-		: false);
 
 watch(
 	() => [
@@ -523,6 +525,11 @@ watch(
 			currentDoc.total_taxes_and_charges ||
 			0;
 
+		// Subtract original SC from base values (replace flat SC with prorated SC)
+		const existingSC = originalServiceCharge.value;
+		const adjustedBaseGrandTotal = baseGrandTotal - existingSC;
+		const adjustedBaseTaxes = baseTaxes - existingSC;
+
 		// 1. Update the native taxes array so the backend balances perfectly
 		const updatedTaxes = Array.isArray(currentDoc.taxes)
 			? currentDoc.taxes.map((t) => ({ ...t }))
@@ -544,10 +551,10 @@ watch(
 			});
 		}
 
-		// 2. Calculate final totals
-		const finalTaxes = parseFloat((baseTaxes + serviceCharge - vatExempt).toFixed(2));
+		// 2. Calculate final totals (replace flat SC with prorated SC)
+		const finalTaxes = parseFloat((adjustedBaseTaxes + serviceCharge - vatExempt).toFixed(2));
 		const finalGrandTotal = parseFloat(
-			(baseGrandTotal + serviceCharge - discount - vatExempt).toFixed(2),
+			(adjustedBaseGrandTotal + serviceCharge - discount - vatExempt).toFixed(2),
 		);
 
 		// 3. Update active payment amount
@@ -593,6 +600,7 @@ watch(
 			total: totals.total,
 			total_taxes_and_charges: finalTaxes,
 			grand_total: finalGrandTotal,
+			discount_amount: 0,
 			payments,
 		};
 
@@ -695,6 +703,7 @@ const handleSave = () => {
 	patched.grand_total = totals.grand_total;
 	patched.custom_service_charge_amount = serviceCharge;
 	patched.posa_service_charge = serviceCharge;
+	patched.discount_amount = 0;
 	patched.payments = syncPaymentsToGrandTotal(patched, patched.grand_total);
 	invoiceStore.setInvoiceDoc(patched);
 

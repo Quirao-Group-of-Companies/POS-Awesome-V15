@@ -150,7 +150,7 @@ function finalizeBreakdown(
 
 /** 5% service charge: regular pax on VAT-inclusive share; SC/PWD pax on VAT-exclusive share. */
 export function computePhServiceCharge(
-	originalGrandTotal: number,
+	baseAmount: number,
 	totalPax: number,
 	scPax: number,
 ): number {
@@ -158,7 +158,7 @@ export function computePhServiceCharge(
 	const senior = Math.max(0, Math.min(total, Math.floor(Number(scPax) || 0)));
 	const regular = Math.max(0, total - senior);
 
-	const sharedPerPerson = (Number(originalGrandTotal) || 0) / total;
+	const sharedPerPerson = (Number(baseAmount) || 0) / total;
 
 	const regularBase = sharedPerPerson * regular;
 	const regularSC = regularBase * 0.05;
@@ -228,8 +228,6 @@ export function applyPhScPwdDiscountToDoc(
 		),
 		total: round2(original.total - totalDeduction + serviceCharge),
 		grand_total: round2(original.grand_total - totalDeduction + serviceCharge),
-		discount_amount: totalDeduction,
-		apply_discount_on: "Grand Total",
 	};
 }
 

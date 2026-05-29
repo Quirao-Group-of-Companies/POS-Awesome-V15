@@ -383,7 +383,8 @@ export function get_invoice_doc(context: any) {
 	// Calculate totals in selected currency ensuring negative values for returns
 	let total = context.Total;
 	if (isReturn && total > 0) total = -Math.abs(total);
-
+	console.log("context", context);
+	
 	doc.total = total;
 	doc.net_total = total; // Will adjust later if taxes are inclusive
 	doc.base_total = total * (context.conversion_rate || 1);

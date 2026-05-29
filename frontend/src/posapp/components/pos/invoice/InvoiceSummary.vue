@@ -29,9 +29,9 @@
 							{{ currencySymbol(displayCurrency) }}{{ formatCurrency(subtotal) }}
 						</strong>
 						<div class="summary-hero__service-charge">
-							<span class="summary-hero__eyebrow">{{ serviceChargeLabel }}</span>
+							<span class="summary-hero__eyebrow">{{ __("Subtotal with Service Charge") }}</span>
 							<strong class="summary-hero__amount">
-								{{ currencySymbol(displayCurrency) }}{{ formatCurrency(serviceChargeAmount) }}
+								{{ currencySymbol(displayCurrency) }}{{ formatCurrency(subtotalWithServiceCharge) }}
 							</strong>
 						</div>
 						
@@ -44,6 +44,11 @@
 								{{ currencySymbol(displayCurrency)
 								}}{{ formatCurrency(total_items_discount_amount) }}
 								{{ __("discount") }}
+							</span>
+							<span>
+								{{ currencySymbol(displayCurrency)
+								}}{{ formatCurrency(serviceChargeAmount) }}
+								{{ serviceChargeLabel }}
 							</span>
 						</div>
 					</div>
@@ -300,6 +305,10 @@ const serviceChargeLabel = computed(() => {
 			? percent
 			: resolvedServiceChargeRate.value * 100);
 	return __("Service Charge ({0}%)", [displayPercent]);
+});
+
+const subtotalWithServiceCharge = computed(() => {
+  return props.subtotal + serviceChargeAmount.value;
 });
 
 const serviceChargeAmount = computed(() => {

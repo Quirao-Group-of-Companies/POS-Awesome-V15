@@ -1,5 +1,6 @@
 import frappe
 from frappe import _, DoesNotExistError
+from frappe.utils import now_datetime
 from erpnext.accounts.doctype.pos_invoice_merge_log.pos_invoice_merge_log import (
     consolidate_pos_invoices,
 )
@@ -182,5 +183,22 @@ def consolidate_closing_shift_invoices(closing_shift_doc):
             for invoice in pos_invoices:
                 invoices_by_currency.setdefault(invoice.currency, []).append(invoice)
 
+            # Wrap closing_shift_doc so set_status() calls from ERPNext don't fail
+            closing_entry_proxy = frappe._dict({
+                "name": None,  # Don't link to POS Closing Entry — this is a Closing Shift
+                "company": closing_shift_doc.company,
+                "posting_date": closing_shift_doc.posting_date,
+                "posting_time": now_datetime().strftime("%H:%M:%S"),
+                "set_status": lambda **kwargs: None,
+                "db_set": lambda *args, **kwargs: None,
+                "update_opening_entry": lambda **kwargs: None,
+                "get": lambda key, default=None: {
+                    "name": None,
+                    "company": closing_shift_doc.company,
+                    "posting_date": closing_shift_doc.posting_date,
+                    "posting_time": now_datetime().strftime("%H:%M:%S"),
+                }.get(key, closing_shift_doc.get(key, default)),
+            })
+
             for invoices in invoices_by_currency.values():
-                consolidate_pos_invoices(pos_invoices=invoices)
+                consolidate_pos_invoices(pos_invoices=invoices, closing_entry=closing_entry_proxy)

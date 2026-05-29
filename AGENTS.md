@@ -12,6 +12,7 @@ Before making any code change, Codex must read and follow:
 2. `docs/FEATURE_CONTRACTS.md`
 3. `docs/CODEX_WORKFLOW.md`
 4. `docs/TESTING_AND_VERIFICATION.md`
+4. `.opencode/skills/erpnext-helper/SKILLS.md`
 
 If any of these files are missing, Codex must report that first before coding.
 

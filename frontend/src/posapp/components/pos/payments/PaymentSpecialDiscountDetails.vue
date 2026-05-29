@@ -109,18 +109,11 @@
 			</v-col>
 
 			<v-col
-				v-if="calculatedServiceCharge > 0 || (isDiscountEligible && isScPwdType && scPwdBreakdown.totalDeduction > 0)"
+				v-if="isScPwdType && (scPwdBreakdown.vatExempt > 0 || scPwdBreakdown.scDiscount > 0 || scPwdBreakdown.totalDeduction > 0)"
 				cols="12"
 				class="pt-0"
 			>
 				<div class="discount-preview text-caption">
-					<div
-						v-if="uiStore.posProfile?.custom_enable_service_charge === 1 && calculatedServiceCharge > 0"
-						class="discount-preview__row"
-					>
-						<span>{{ __("Service Charge (5%)") }}</span>
-						<strong>{{ formatMoney(calculatedServiceCharge) }}</strong>
-					</div>
 					<div
 						v-if="isScPwdType && scPwdBreakdown.vatExempt > 0"
 						class="discount-preview__row"
@@ -197,7 +190,6 @@ import {
 	clearPhScPwdDiscountFromDoc,
 	computePhScPwdBreakdownFromGrandTotal,
 	computePhScPwdBreakdownFromItems,
-	computePhServiceCharge,
 	resolveTotalPaxFromDoc,
 	round2,
 } from "../../../utils/phScPwdDiscount.ts";
@@ -315,23 +307,41 @@ watch(
 	{ immediate: true },
 );
 
-const calculatedServiceCharge = computed(() => {
-	const isScEnabled = uiStore.posProfile?.custom_enable_service_charge === 1;
+const resolveActivePosProfile = () =>
+	uiStore.posProfile || uiStore.profile || uiStore.pos_profile || {};
 
-	if (!isScEnabled) {
-		return 0;
-	}
+const calculatedServiceCharge = computed(() => {
+	// Safely parse the checkbox flag (posProfile is the Pinia store field)
+	const profile = resolveActivePosProfile();
+	const isScEnabled = Number(profile.custom_enable_service_charge) === 1;
+	if (!isScEnabled) return 0;
 
 	const total = Math.max(1, Math.floor(Number(localTotalPax.value || 1)));
-	const senior = isScPwdType.value
-		? Math.max(0, Math.min(total, Math.floor(Number(localScPax.value || 0))))
-		: 0;
+	let senior = Math.max(0, Math.min(total, Math.floor(Number(localScPax.value || 0))));
+	if (!isScPwdType.value) {
+		senior = 0;
+	}
+	const regular = Math.max(0, total - senior);
 
-	return computePhServiceCharge(
-		originalValues.value.grand_total || 0,
-		total,
-		senior,
-	);
+	// Fallback to current document grand total if originalValues is not yet populated
+	const baseGrandTotal =
+		originalValues.value.grand_total ||
+		invoiceStore.invoiceDoc?.custom_original_grand_total ||
+		invoiceStore.invoiceDoc?.grand_total ||
+		props.invoiceDoc?.grand_total ||
+		0;
+	if (!baseGrandTotal) return 0;
+
+	const sharedPerPerson = baseGrandTotal / total;
+
+	const regularBase = sharedPerPerson * regular;
+	const regularSC = regularBase * 0.05;
+
+	const seniorGrossShare = sharedPerPerson * senior;
+	const seniorVatExemptBase = seniorGrossShare / 1.12;
+	const seniorSC = seniorVatExemptBase * 0.05;
+
+	return Number((regularSC + seniorSC).toFixed(2));
 });
 
 const scPwdBreakdown = computed(() => {
@@ -378,16 +388,17 @@ const calculatedVatExemption = computed(() =>
 );
 
 const discountedTotals = computed(() => {
-	const discount = Number(totalDiscount.value || 0);
-	const vatExempt = Number(calculatedVatExemption.value || 0);
+	// Only subtract discounts if "Apply Discount" was officially clicked
+	const discount = isApplied.value ? Number(totalDiscount.value || 0) : 0;
+	const vatExempt = isApplied.value ? Number(calculatedVatExemption.value || 0) : 0;
+
+	// Service Charge ALWAYS applies (if enabled in profile)
 	const serviceCharge = Number(calculatedServiceCharge.value || 0);
 
 	return {
 		net_total: parseFloat((originalValues.value.net_total - discount).toFixed(2)),
 		total_taxes_and_charges: parseFloat(
-			(originalValues.value.total_taxes_and_charges - vatExempt + serviceCharge).toFixed(
-				2,
-			),
+			(originalValues.value.total_taxes_and_charges - vatExempt + serviceCharge).toFixed(2),
 		),
 		total: parseFloat((originalValues.value.total - discount - vatExempt).toFixed(2)),
 		grand_total: parseFloat(
@@ -473,6 +484,135 @@ watch(
 	{ immediate: true },
 );
 
+const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
+
+const resolveServiceChargeAccountHead = () =>
+	uiStore.companyDoc?.default_service_charge_account ||
+	uiStore.posProfile?.default_service_charge_account ||
+	"Service Charge Payable";
+
+const isServiceChargeTaxRow = (tax) =>
+	tax?.charge_type === "Actual" &&
+	(typeof tax?.description === "string"
+		? tax.description.includes(SERVICE_CHARGE_TAX_DESCRIPTION)
+		: false);
+
+watch(
+	() => [
+		calculatedServiceCharge.value,
+		totalDiscount.value,
+		calculatedVatExemption.value,
+		invoiceStore.invoiceDoc?.name,
+		props.invoiceDoc?.name,
+	],
+	([serviceCharge, discount, vatExempt]) => {
+		if (saving.value) return;
+
+		const currentDoc = invoiceStore.invoiceDoc || props.invoiceDoc;
+		if (!currentDoc) return;
+
+		const baseGrandTotal =
+			originalValues.value.grand_total ||
+			currentDoc.custom_original_grand_total ||
+			currentDoc.grand_total ||
+			props.invoiceDoc?.grand_total ||
+			0;
+		const baseTaxes =
+			originalValues.value.total_taxes_and_charges ||
+			currentDoc.custom_original_total_taxes_and_charges ||
+			currentDoc.total_taxes_and_charges ||
+			0;
+
+		// 1. Update the native taxes array so the backend balances perfectly
+		const updatedTaxes = Array.isArray(currentDoc.taxes)
+			? currentDoc.taxes.map((t) => ({ ...t }))
+			: [];
+		const scTaxRow = updatedTaxes.find((t) => isServiceChargeTaxRow(t));
+
+		if (scTaxRow) {
+			scTaxRow.tax_amount = serviceCharge;
+			scTaxRow.base_tax_amount = serviceCharge;
+		} else if (serviceCharge > 0) {
+			updatedTaxes.push({
+				charge_type: "Actual",
+				account_head: resolveServiceChargeAccountHead(),
+				description: SERVICE_CHARGE_TAX_DESCRIPTION,
+				tax_amount: serviceCharge,
+				base_tax_amount: serviceCharge,
+				rate: 0,
+				included_in_print_rate: 0,
+			});
+		}
+
+		// 2. Calculate final totals
+		const finalTaxes = parseFloat((baseTaxes + serviceCharge - vatExempt).toFixed(2));
+		const finalGrandTotal = parseFloat(
+			(baseGrandTotal + serviceCharge - discount - vatExempt).toFixed(2),
+		);
+
+		// 3. Update active payment amount
+		const payments = Array.isArray(currentDoc?.payments)
+			? currentDoc.payments.map((p) => ({ ...p }))
+			: [];
+		const defaultPayment = payments.find((p) => p.default === 1) || payments[0];
+		let nextDefaultAmount = 0;
+
+		if (defaultPayment) {
+			const otherPaymentsTotal = payments
+				.filter((p) => p !== defaultPayment)
+				.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+			nextDefaultAmount = parseFloat(
+				Math.max(finalGrandTotal - otherPaymentsTotal, 0).toFixed(2),
+			);
+			defaultPayment.amount = nextDefaultAmount;
+		}
+
+		const totals = discountedTotals.value;
+		const existingScTaxAmount = round2(
+			(Array.isArray(currentDoc.taxes) ? currentDoc.taxes : []).find((t) =>
+				isServiceChargeTaxRow(t),
+			)?.tax_amount,
+		);
+
+		if (
+			round2(currentDoc.grand_total) === round2(finalGrandTotal) &&
+			round2(currentDoc.total_taxes_and_charges) === round2(finalTaxes) &&
+			round2(currentDoc.custom_service_charge_amount) === round2(serviceCharge) &&
+			existingScTaxAmount === round2(serviceCharge) &&
+			(!defaultPayment || round2(defaultPayment.amount) === round2(nextDefaultAmount))
+		) {
+			return;
+		}
+
+		const patch = {
+			...currentDoc,
+			taxes: updatedTaxes,
+			custom_service_charge_amount: serviceCharge,
+			posa_service_charge: serviceCharge,
+			net_total: totals.net_total,
+			total: totals.total,
+			total_taxes_and_charges: finalTaxes,
+			grand_total: finalGrandTotal,
+			payments,
+		};
+
+		if (
+			currentDoc.custom_original_grand_total == null ||
+			currentDoc.custom_original_grand_total === ""
+		) {
+			patch.custom_original_net_total = originalValues.value.net_total || currentDoc.net_total;
+			patch.custom_original_total = originalValues.value.total || currentDoc.total;
+			patch.custom_original_grand_total = baseGrandTotal;
+			patch.custom_original_total_taxes_and_charges = baseTaxes;
+		}
+
+		// 4. Safely mutate the store
+		invoiceStore.setInvoiceDoc(patch);
+		eventBus?.emit?.("payment_invoice_totals_updated");
+	},
+	{ immediate: true, deep: true },
+);
+
 watch(
 	() => props.invoiceDoc?.custom_customer_count,
 	() => syncTotalPaxFromCustomerCount(props.invoiceDoc),
@@ -511,61 +651,14 @@ watch(
 	{ immediate: true },
 );
 
-const applyDiscountedTotalsToStore = () => {
-	if (saving.value) return;
-
-	const original = originalValues.value;
-	const baseGrand = Number(original?.grand_total || 0);
-	const docGrand = Number(props.invoiceDoc?.grand_total || invoiceStore.invoiceDoc?.grand_total || 0);
-	if (!baseGrand && !docGrand) return;
-
-	const totals = discountedTotals.value;
-	const serviceCharge = calculatedServiceCharge.value;
-	const currentDoc = { ...(invoiceStore.invoiceDoc || props.invoiceDoc || {}) };
-	const payments = syncPaymentsToGrandTotal(
-		{ ...currentDoc, grand_total: totals.grand_total },
-		totals.grand_total,
-	);
-
-	const patch = {
+const syncMetaToStore = () => {
+	invoiceStore.mergeInvoiceDoc({
 		custom_special_discount_type: selectedDiscountType.value,
 		custom_special_discount_details: childTableData.value,
 		custom_total_pax: normalizedTotalPax.value,
 		custom_sc_pwd_pax: isScPwdType.value ? effectiveScPax.value : 0,
-		custom_service_charge_amount: serviceCharge,
-		posa_service_charge: serviceCharge,
-		net_total: totals.net_total,
-		total: totals.total,
-		total_taxes_and_charges: totals.total_taxes_and_charges,
-		grand_total: totals.grand_total,
-		payments,
-	};
-
-	if (
-		currentDoc.custom_original_grand_total == null ||
-		currentDoc.custom_original_grand_total === ""
-	) {
-		patch.custom_original_net_total = original.net_total;
-		patch.custom_original_total = original.total;
-		patch.custom_original_grand_total = original.grand_total;
-		patch.custom_original_total_taxes_and_charges = original.total_taxes_and_charges;
-	}
-
-	invoiceStore.mergeInvoiceDoc(patch);
-	eventBus?.emit?.("payment_invoice_totals_updated");
+	});
 };
-
-const syncMetaToStore = () => {
-	applyDiscountedTotalsToStore();
-};
-
-watch(
-	discountedTotals,
-	() => {
-		applyDiscountedTotalsToStore();
-	},
-	{ deep: true, immediate: true },
-);
 
 const handleSave = () => {
 	if (!isDiscountEligible.value) return;
@@ -631,7 +724,6 @@ const handleClear = () => {
 	userAdjustedTotalPax.value = false;
 	originalValues.value = original;
 	syncTotalPaxFromCustomerCount(cleared, { force: true });
-	applyDiscountedTotalsToStore();
 };
 
 watch(

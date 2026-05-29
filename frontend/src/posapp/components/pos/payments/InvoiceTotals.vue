@@ -122,6 +122,24 @@
 				persistent-placeholder
 			></v-text-field>
 		</v-col>
+		<v-col
+			v-if="uiStore.posProfile?.custom_enable_service_charge === 1"
+			cols="12"
+			sm="6"
+		>
+			<v-text-field
+				density="compact"
+				variant="solo"
+				color="primary"
+				:label="frappe._('Service Charge (5%)')"
+				class="sleek-field pos-themed-input"
+				hide-details
+				:model-value="formatCurrency(serviceChargeAmount, displayCurrency)"
+				readonly
+				:prefix="currencySymbol(invoice_doc.currency)"
+				persistent-placeholder
+			></v-text-field>
+		</v-col>
 		<v-col cols="12" sm="6">
 			<v-text-field
 				density="compact"
@@ -169,6 +187,11 @@
 
 <script setup>
 import { computed } from "vue";
+import { useInvoiceStore } from "../../../stores/invoiceStore.js";
+import { useUIStore } from "../../../stores/uiStore.js";
+
+const invoiceStore = useInvoiceStore();
+const uiStore = useUIStore();
 
 const props = defineProps({
 	invoice_doc: Object,
@@ -184,6 +207,10 @@ const props = defineProps({
 });
 
 const frappe = window.frappe;
+
+const serviceChargeAmount = computed(() =>
+	Number(invoiceStore.invoiceDoc?.custom_service_charge_amount || 0),
+);
 
 const toNumber = (value) => {
 	const parsed = Number(value || 0);

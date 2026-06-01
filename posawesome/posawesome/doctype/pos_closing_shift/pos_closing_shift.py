@@ -65,6 +65,23 @@ class POSClosingShift(Document):
             d.difference = +flt(d.closing_amount, precision) - flt(d.expected_amount, precision)
 
     def on_submit(self):
+        # LOG closing shift state
+        payment_summary = [
+            f"{d.mode_of_payment}: opening={d.opening_amount}, expected={d.expected_amount}, closing={d.closing_amount}, diff={d.difference}"
+            for d in self.payment_reconciliation
+        ]
+        frappe.log_error(
+            title="POSA CLOSING SHIFT SUBMIT",
+            message=f"""
+                === POS Closing Shift {self.name} ===
+                pos_profile={self.pos_profile}
+                company={self.company}
+                payment_reconciliation:
+                {chr(10).join('  ' + s for s in payment_summary)}
+                pos_transactions: {[(d.pos_invoice or d.sales_invoice, d.grand_total) for d in self.pos_transactions]}
+                """
+                        )
+
         opening_entry = frappe.get_doc("POS Opening Shift", self.pos_opening_shift)
         opening_entry.pos_closing_shift = self.name
         opening_entry.set_status()

@@ -74,7 +74,7 @@
 				<div class="posa-form-section">
 					<div class="posa-section-header">
 						<v-icon size="small" class="section-icon">mdi-currency-usd</v-icon>
-						<span class="posa-section-title">{{ __("Pricing & Discounts") }}</span>
+						<span class="posa-section-title">{{ __("Pricing") }}</span>
 					</div>
 					<div class="posa-form-row">
 						<div class="posa-form-field">
@@ -95,50 +95,6 @@
 									!pos_profile.posa_allow_user_to_edit_rate || !!item.posa_is_replace
 								"
 								prepend-inner-icon="mdi-currency-usd"
-							></v-text-field>
-						</div>
-						<div class="posa-form-field">
-							<v-text-field
-								density="compact"
-								variant="outlined"
-								color="primary"
-								id="discount_percentage"
-								:label="frappe._('Discount %')"
-								class="pos-themed-input"
-								hide-details
-								:model-value="formatFloat(Math.abs(item.discount_percentage || 0))"
-								@change="[
-									setFormatedCurrency(item, 'discount_percentage', null, false, $event),
-									calcPrices(item, $event.target.value, $event),
-								]"
-								:disabled="
-									!pos_profile.posa_allow_user_to_edit_item_discount ||
-									!!item.posa_is_replace ||
-									!!item.posa_offer_applied
-								"
-								prepend-inner-icon="mdi-percent"
-							></v-text-field>
-						</div>
-						<div class="posa-form-field">
-							<v-text-field
-								density="compact"
-								variant="outlined"
-								color="primary"
-								id="discount_amount"
-								:label="frappe._('Discount Amount')"
-								class="pos-themed-input"
-								hide-details
-								:model-value="formatCurrency(Math.abs(item.discount_amount || 0))"
-								@change="[
-									setFormatedCurrency(item, 'discount_amount', null, false, $event),
-									calcPrices(item, $event.target.value, $event),
-								]"
-								:disabled="
-									!pos_profile.posa_allow_user_to_edit_item_discount ||
-									!!item.posa_is_replace ||
-									!!item.posa_offer_applied
-								"
-								prepend-inner-icon="mdi-tag-minus"
 							></v-text-field>
 						</div>
 					</div>

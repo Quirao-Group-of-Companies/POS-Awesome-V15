@@ -63,6 +63,9 @@ def get_kitchen_orders(company=None):
 
 	parent_names = [row.name for row in invoices]
 	item_fields = ["name", "parent", "item_code", "item_name", "qty", "idx"]
+	has_item_group_column = frappe.db.has_column(item_doctype, "item_group")
+	if has_item_group_column:
+		item_fields.append("item_group")
 	if frappe.db.has_column(item_doctype, "custom_kitchen_served"):
 		item_fields.append("custom_kitchen_served")
 
@@ -74,15 +77,30 @@ def get_kitchen_orders(company=None):
 		limit_page_length=2000,
 	)
 
+	item_group_by_code = {}
+	if not has_item_group_column:
+		item_codes = list({row.get("item_code") for row in items if row.get("item_code")})
+		if item_codes:
+			for row in frappe.get_all(
+				"Item",
+				filters={"item_code": ["in", item_codes]},
+				fields=["item_code", "item_group"],
+			):
+				item_group_by_code[row.item_code] = row.get("item_group") or ""
+
 	items_by_parent = {}
 	for item in items:
 		if flt(item.get("qty")) <= 0:
 			continue
+		item_group = (item.get("item_group") or "").strip()
+		if not item_group:
+			item_group = (item_group_by_code.get(item.get("item_code")) or "").strip()
 		items_by_parent.setdefault(item.parent, []).append(
 			{
 				"name": item.name,
 				"item_code": item.get("item_code"),
 				"item_name": item.get("item_name") or item.get("item_code"),
+				"item_group": item_group,
 				"qty": flt(item.get("qty")),
 				"custom_kitchen_served": 1
 				if cint(item.get("custom_kitchen_served"))

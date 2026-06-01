@@ -8,7 +8,10 @@ export type RestaurantTableStatusEntry = {
 	restaurant_table?: string;
 	restaurant_table_label?: string;
 	restaurant_floor?: string;
+	creation?: string;
 	docstatus?: number;
+	modified?: string;
+	grand_total?: number;
 };
 
 export type RestaurantTableStatusMap = Record<string, RestaurantTableStatusEntry>;

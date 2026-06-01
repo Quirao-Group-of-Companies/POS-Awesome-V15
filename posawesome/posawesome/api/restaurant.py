@@ -54,8 +54,10 @@ def get_restaurant_table_status(company=None, pos_profile=None, floor=None):
         "restaurant_table",
         "restaurant_table_label",
         "restaurant_floor",
+        "creation",
         "docstatus",
         "modified",
+        "grand_total",
         "outstanding_amount",
     ]
 
@@ -93,7 +95,10 @@ def get_restaurant_table_status(company=None, pos_profile=None, floor=None):
             "restaurant_table": table_key,
             "restaurant_table_label": label,
             "restaurant_floor": row_floor,
+            "creation": row.get("creation"),
             "docstatus": row.get("docstatus"),
+            "modified": row.get("modified"),
+            "grand_total": flt(row.get("grand_total")),
         }
 
         for lookup_key in {table_key, label}:

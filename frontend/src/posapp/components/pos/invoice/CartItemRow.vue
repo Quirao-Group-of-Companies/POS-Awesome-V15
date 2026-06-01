@@ -200,92 +200,6 @@
 				</div>
 			</td>
 
-			<!-- Discount % (Optional) -->
-			<td
-				v-else-if="column.key === 'discount_percentage'"
-				class="text-center"
-				:data-column-key="'discount_percentage'"
-			>
-				<div class="posa-cart-table__editor-box">
-					<div
-						v-if="!isEditingDiscountPercent"
-						class="posa-cart-table__editor-display"
-						@click.stop="openDiscountPercentEdit"
-						tabindex="0"
-						role="button"
-						:aria-label="__('Edit discount percentage')"
-						@keydown.enter.prevent="openDiscountPercentEdit"
-						@keydown.space.prevent="openDiscountPercentEdit"
-					>
-						<span class="amount-value">
-							{{
-								formatFloat(
-									Math.abs(
-										item.discount_percentage ||
-											(item.price_list_rate
-												? (item.discount_amount / item.price_list_rate) * 100
-												: 0),
-									),
-								)
-							}}%
-						</span>
-					</div>
-					<v-text-field
-						v-else
-						v-model="editingDiscountPercentValue"
-						density="compact"
-						variant="outlined"
-						class="posa-cart-table__editor-input"
-						@blur="closeDiscountPercentEdit"
-						@keydown.enter.prevent="closeDiscountPercentEdit"
-						@click.stop
-						ref="discountPercentInput"
-						:autofocus="true"
-						type="number"
-						:disabled="disableDiscountEdit"
-					></v-text-field>
-				</div>
-			</td>
-
-			<!-- Discount Amount (Optional) -->
-			<td
-				v-else-if="column.key === 'discount_amount'"
-				class="text-center"
-				:data-column-key="'discount_amount'"
-			>
-				<div class="posa-cart-table__editor-box">
-					<div
-						v-if="!isEditingDiscountAmount"
-						class="posa-cart-table__editor-display"
-						@click.stop="openDiscountAmountEdit"
-						tabindex="0"
-						role="button"
-						:aria-label="__('Edit discount amount')"
-						@keydown.enter.prevent="openDiscountAmountEdit"
-						@keydown.space.prevent="openDiscountAmountEdit"
-					>
-						<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
-						<span class="amount-value">{{
-							formatCurrency(Math.abs(item.discount_amount || 0))
-						}}</span>
-					</div>
-					<v-text-field
-						v-else
-						v-model="editingDiscountAmountValue"
-						density="compact"
-						variant="outlined"
-						class="posa-cart-table__editor-input"
-						@blur="closeDiscountAmountEdit"
-						@keydown.enter.prevent="closeDiscountAmountEdit"
-						@click.stop
-						ref="discountAmountInput"
-						:autofocus="true"
-						type="number"
-						:disabled="disableDiscountEdit"
-					></v-text-field>
-				</div>
-			</td>
-
 			<!-- Rate Column -->
 			<td v-else-if="column.key === 'rate'" class="text-center" :data-column-key="'rate'">
 				<div class="posa-cart-table__editor-box">
@@ -421,8 +335,6 @@ const emit = defineEmits([
 	"minus-click",
 	"calc-uom",
 	"update-rate",
-	"update-discount-percent",
-	"update-discount-amount",
 	"toggle-offer",
 	"open-item-details",
 	"remove-item",
@@ -435,15 +347,9 @@ const editingQtyValue = ref("");
 const isEditingUom = ref(false);
 const isEditingRate = ref(false);
 const editingRateValue = ref("");
-const isEditingDiscountPercent = ref(false);
-const editingDiscountPercentValue = ref("");
-const isEditingDiscountAmount = ref(false);
-const editingDiscountAmountValue = ref("");
 
 const qtyInput = ref(null);
 const rateInput = ref(null);
-const discountPercentInput = ref(null);
-const discountAmountInput = ref(null);
 const uomSelect = ref(null);
 
 const memoDeps = computed(() => {
@@ -451,8 +357,6 @@ const memoDeps = computed(() => {
 		props.item.qty,
 		props.item.rate,
 		props.item.amount,
-		props.item.discount_amount,
-		props.item.discount_percentage,
 		props.item.uom,
 		props.item.item_name,
 		props.item.name_overridden,
@@ -464,12 +368,9 @@ const memoDeps = computed(() => {
 		props.item.is_free_item,
 		props.item.price_list_rate,
 		props.visibleColumns.map((column) => column?.key).join("|"),
-		// Include edit states to ensure UI updates when switching modes
 		isEditingQty.value,
 		isEditingRate.value,
 		isEditingUom.value,
-		isEditingDiscountPercent.value,
-		isEditingDiscountAmount.value,
 	];
 });
 
@@ -500,13 +401,6 @@ const disableUomEdit = computed(() => !!props.item.posa_is_replace);
 
 const disableRateEdit = computed(
 	() => !props.posProfile.posa_allow_user_to_edit_rate || !!props.item.posa_is_replace,
-);
-
-const disableDiscountEdit = computed(
-	() =>
-		!props.posProfile.posa_allow_user_to_edit_item_discount ||
-		!!props.item.posa_is_replace ||
-		!!props.item.posa_offer_applied,
 );
 
 function openQtyEdit() {
@@ -593,50 +487,6 @@ function closeRateEdit() {
 		}
 		isEditingRate.value = false;
 		editingRateValue.value = "";
-	}
-}
-
-function openDiscountPercentEdit() {
-	if (disableDiscountEdit.value) return;
-	isEditingDiscountPercent.value = true;
-	editingDiscountPercentValue.value = "";
-	nextTick(() => {
-		discountPercentInput.value?.focus();
-	});
-}
-
-function closeDiscountPercentEdit() {
-	if (isEditingDiscountPercent.value) {
-		if (editingDiscountPercentValue.value !== "" && editingDiscountPercentValue.value != null) {
-			const newDiscount = parseFloat(editingDiscountPercentValue.value);
-			if (Number.isFinite(newDiscount) && newDiscount !== props.item.discount_percentage) {
-				emit("update-discount-percent", props.item, newDiscount);
-			}
-		}
-		isEditingDiscountPercent.value = false;
-		editingDiscountPercentValue.value = "";
-	}
-}
-
-function openDiscountAmountEdit() {
-	if (disableDiscountEdit.value) return;
-	isEditingDiscountAmount.value = true;
-	editingDiscountAmountValue.value = "";
-	nextTick(() => {
-		discountAmountInput.value?.focus();
-	});
-}
-
-function closeDiscountAmountEdit() {
-	if (isEditingDiscountAmount.value) {
-		if (editingDiscountAmountValue.value !== "" && editingDiscountAmountValue.value != null) {
-			const newDiscount = parseFloat(editingDiscountAmountValue.value);
-			if (Number.isFinite(newDiscount) && newDiscount !== props.item.discount_amount) {
-				emit("update-discount-amount", props.item, newDiscount);
-			}
-		}
-		isEditingDiscountAmount.value = false;
-		editingDiscountAmountValue.value = "";
 	}
 }
 </script>

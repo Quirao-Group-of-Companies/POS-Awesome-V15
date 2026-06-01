@@ -80,38 +80,49 @@
 					</div>
 				</header>
 
-				<ul class="kitchen-order-card__items">
-					<li
-						v-for="item in order.items"
-						:key="item.name"
-						class="kitchen-order-card__item"
-						:class="{ 'kitchen-order-card__item--served': item.custom_kitchen_served }"
+				<div class="kitchen-order-card__items">
+					<section
+						v-for="group in groupedItems(order.items)"
+						:key="`${order.name}-${group.category}`"
+						class="kitchen-order-card__group"
 					>
-						<v-checkbox
-							:model-value="Boolean(item.custom_kitchen_served)"
-							hide-details
-							density="compact"
-							color="success"
-							:disabled="Boolean(item._saving)"
-							@update:model-value="(checked) => toggleItemServed(order, item, checked)"
-						>
-							<template #label>
-								<span class="kitchen-item-label">
-									<v-chip
-										v-if="itemQty(item) > 1"
-										class="kitchen-qty-chip"
-										color="deep-orange"
-										variant="flat"
-										size="small"
-									>
-										{{ formatQty(item) }}
-									</v-chip>
-									<span class="kitchen-item-name">{{ itemDisplayName(item) }}</span>
-								</span>
-							</template>
-						</v-checkbox>
-					</li>
-				</ul>
+						<div class="kitchen-order-card__group-title text-caption text-medium-emphasis text-uppercase">
+							{{ group.category }}
+						</div>
+						<ul class="kitchen-order-card__group-list">
+							<li
+								v-for="item in group.items"
+								:key="item.name"
+								class="kitchen-order-card__item"
+								:class="{ 'kitchen-order-card__item--served': item.custom_kitchen_served }"
+							>
+								<v-checkbox
+									:model-value="Boolean(item.custom_kitchen_served)"
+									hide-details
+									density="compact"
+									color="success"
+									:disabled="Boolean(item._saving)"
+									@update:model-value="(checked) => toggleItemServed(order, item, checked)"
+								>
+									<template #label>
+										<span class="kitchen-item-label">
+											<v-chip
+												v-if="itemQty(item) > 1"
+												class="kitchen-qty-chip"
+												color="deep-orange"
+												variant="flat"
+												size="small"
+											>
+												{{ formatQty(item) }}
+											</v-chip>
+											<span class="kitchen-item-name">{{ itemDisplayName(item) }}</span>
+										</span>
+									</template>
+								</v-checkbox>
+							</li>
+						</ul>
+					</section>
+				</div>
 
 				<footer class="kitchen-order-card__footer">
 					<span class="kitchen-order-card__footer-count">
@@ -266,6 +277,31 @@ const formatQty = (item) => {
 };
 
 const itemDisplayName = (item) => item?.item_name || item?.item_code || __("Item");
+
+const UNCATEGORIZED_GROUP = __("Uncategorized");
+
+const groupedItems = (items) => {
+	if (!Array.isArray(items) || !items.length) {
+		return [];
+	}
+
+	const groups = {};
+	const groupOrder = [];
+
+	for (const item of items) {
+		const category = String(item?.item_group || "").trim() || UNCATEGORIZED_GROUP;
+		if (!groups[category]) {
+			groups[category] = [];
+			groupOrder.push(category);
+		}
+		groups[category].push(item);
+	}
+
+	return groupOrder.map((category) => ({
+		category,
+		items: groups[category],
+	}));
+};
 
 const servedCount = (order) =>
 	(order?.items || []).filter((item) => Boolean(item.custom_kitchen_served)).length;
@@ -732,9 +768,28 @@ onBeforeUnmount(() => {
 
 .kitchen-order-card__items {
 	flex: 1;
-	list-style: none;
 	margin: 0;
 	padding: 8px 8px 4px;
+}
+
+.kitchen-order-card__group + .kitchen-order-card__group {
+	margin-top: 8px;
+	padding-top: 4px;
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.kitchen-order-card__group-title {
+	margin: 2px 8px 4px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	opacity: 0.72;
+}
+
+.kitchen-order-card__group-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
 }
 
 .kitchen-order-card__item {

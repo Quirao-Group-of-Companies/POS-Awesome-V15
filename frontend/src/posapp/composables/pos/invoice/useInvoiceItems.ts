@@ -92,18 +92,6 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 			required: false,
 			width: "120px",
 		},
-		{
-			title: __("Discount %"),
-			key: "discount_percentage",
-			align: "end",
-			required: false,
-		},
-		{
-			title: __("Discount Amount"),
-			key: "discount_amount",
-			align: "end",
-			required: false,
-		},
 		{ title: __("Rate"), key: "rate", align: "center", required: true },
 		{ title: __("Amount"), key: "amount", align: "center", required: true },
 		{
@@ -128,31 +116,26 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 		);
 	});
 
+	const hiddenItemColumnKeys = new Set([
+		"discount_value",
+		"discount_percentage",
+		"discount_amount",
+	]);
+
 	const loadColumnPreferences = () => {
 		try {
 			const saved = localStorage.getItem("posawesome_selected_columns");
 			if (saved) {
 				const parsed: string[] = JSON.parse(saved);
-				// Migrate old "discount_value" key (renamed to "discount_percentage")
-				selected_columns.value = parsed.map((key) =>
-					key === "discount_value" ? "discount_percentage" : key,
-				);
+				selected_columns.value = parsed
+					.map((key) => (key === "discount_value" ? "discount_percentage" : key))
+					.filter((key) => !hiddenItemColumnKeys.has(key));
 			} else if (pos_profile.value) {
 				// Default selection based on POS Profile
 				selected_columns.value = available_columns.value
 					.filter((col) => {
 						if (col.required) return true;
 						if (col.key === "price_list_rate") return true;
-						if (
-							col.key === "discount_percentage" &&
-							pos_profile.value?.posa_display_discount_percentage
-						)
-							return true;
-						if (
-							col.key === "discount_amount" &&
-							pos_profile.value?.posa_display_discount_amount
-						)
-							return true;
 						return false;
 					})
 					.map((col) => col.key);

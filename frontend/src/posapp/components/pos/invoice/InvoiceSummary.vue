@@ -45,10 +45,9 @@
 								}}{{ formatCurrency(total_items_discount_amount) }}
 								{{ __("discount") }}
 							</span>
-							<span>
-								{{ currencySymbol(displayCurrency)
-								}}{{ formatCurrency(serviceChargeAmount) }}
-								{{ serviceChargeLabel }}
+							<span v-if="isScEnabled">
+								{{ currencySymbol(displayCurrency) }}{{ formatCurrency(estimatedServiceCharge) }}
+								{{ __("Service Charge (5% - Applied at Payment)") }}
 							</span>
 						</div>
 					</div>
@@ -298,6 +297,18 @@ const resolvedServiceChargeRate = computed(() => {
 	return Number.isFinite(percent) && percent >= 0 ? percent / 100 : 0.05;
 });
 
+const isScEnabled = computed(
+	() => uiStore?.posProfile?.custom_enable_service_charge === 1,
+);
+
+const estimatedServiceCharge = computed(() => {
+	if (!isScEnabled.value) return 0;
+	// Keep this as an estimate only; actual pax-based math is applied in Payments.
+	const currentTotal = Number(props.subtotal || 0);
+	if (!Number.isFinite(currentTotal) || currentTotal <= 0) return 0;
+	return Number((currentTotal * 0.05).toFixed(2));
+});
+
 const serviceChargeLabel = computed(() => {
 	const percent = Number(props.service_charge_percent);
 	const displayPercent =
@@ -308,11 +319,7 @@ const serviceChargeLabel = computed(() => {
 });
 
 const subtotalWithServiceCharge = computed(() => {
-  return props.subtotal + serviceChargeAmount.value;
-});
-
-const serviceChargeAmount = computed(() => {
-	return props.subtotal * resolvedServiceChargeRate.value;
+	return Number(props.subtotal || 0) + Number(estimatedServiceCharge.value || 0);
 });
 const allDrafts = computed(() => (Array.isArray(parkedOrders.value) ? parkedOrders.value : []));
 const availableDraftSources = computed(() => getAvailableDocumentSources(props.pos_profile));

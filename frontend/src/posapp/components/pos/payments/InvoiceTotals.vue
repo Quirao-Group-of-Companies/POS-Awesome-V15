@@ -35,7 +35,7 @@
 				:label="frappe._('Total Amount')"
 				class="sleek-field pos-themed-input"
 				hide-details
-				:model-value="formatCurrency(invoice_doc.total, displayCurrency)"
+				:model-value="formatCurrency(invoice_doc.grand_total, displayCurrency)"
 				readonly
 				:prefix="currencySymbol()"
 				persistent-placeholder
@@ -57,6 +57,70 @@
 				persistent-placeholder
 			></v-text-field>
 		</v-col>
+
+		<!-- Philippine POS Breakdown -->
+		<v-col v-if="posBreakdown" cols="12" class="pt-2">
+			<div class="pos-breakdown">
+				<div class="pos-breakdown__title">
+					{{ frappe._("Amount Breakdown") }}
+				</div>
+
+				<div class="pos-breakdown__row">
+					<span>{{ frappe._("Subtotal") }}</span>
+					<strong>{{ formatCurrency(posBreakdown.subtotal) }}</strong>
+				</div>
+
+				<div class="pos-breakdown__row pos-breakdown__row--indent">
+					<span>{{ frappe._("VATable Sales (excl. VAT)") }}</span>
+					<span>{{ formatCurrency(posBreakdown.vatableSales) }}</span>
+				</div>
+				<div class="pos-breakdown__row pos-breakdown__row--indent">
+					<span>{{ frappe._("VAT Exempt Sales") }}</span>
+					<span>{{ formatCurrency(posBreakdown.vatExemptSales) }}</span>
+				</div>
+
+				<div class="pos-breakdown__row">
+					<span>{{ frappe._("VAT (12%)") }}</span>
+					<strong>{{ formatCurrency(posBreakdown.vatAmount) }}</strong>
+				</div>
+
+				<div v-if="posBreakdown.serviceCharge > 0" class="pos-breakdown__row">
+					<span>{{ frappe._("Service Charge (5%)") }}</span>
+					<strong>{{ formatCurrency(posBreakdown.serviceCharge) }}</strong>
+				</div>
+
+				<div class="pos-breakdown__divider"></div>
+
+				<div
+					v-if="posBreakdown.seniorDiscount > 0"
+					class="pos-breakdown__row pos-breakdown__row--deduction"
+				>
+					<span>{{ frappe._("LESS: Senior/PWD Discount") }}</span>
+					<strong class="text-error">
+						&minus;{{ formatCurrency(posBreakdown.totalDiscount) }}
+					</strong>
+				</div>
+				<div
+					v-if="posBreakdown.vatExemptionAdjustment > 0"
+					class="pos-breakdown__row pos-breakdown__row--deduction"
+				>
+					<span>{{ frappe._("LESS: VAT Exempt Adjustment") }}</span>
+					<strong class="text-error">
+						&minus;{{ formatCurrency(posBreakdown.vatExemptionAdjustment) }}
+					</strong>
+				</div>
+
+				<div class="pos-breakdown__divider pos-breakdown__divider--thick"></div>
+
+				<div class="pos-breakdown__row pos-breakdown__row--total">
+					<span>{{ frappe._("Total Amount Due") }}</span>
+					<strong class="text-primary">
+						{{ formatCurrency(posBreakdown.grandTotal) }}
+					</strong>
+				</div>
+			</div>
+		</v-col>
+
 		<v-col cols="12" sm="6">
 			<v-text-field
 				density="compact"
@@ -175,6 +239,7 @@
 import { computed } from "vue";
 import { useInvoiceStore } from "../../../stores/invoiceStore.js";
 import { useUIStore } from "../../../stores/uiStore.js";
+import { calculatePosBreakdownFromDoc } from "../../../utils/phScPwdDiscount.js";
 
 const invoiceStore = useInvoiceStore();
 const uiStore = useUIStore();
@@ -229,6 +294,17 @@ const discountHelpText = computed(
 	() =>
 		`${frappe._("Item and rate discounts are already included in item rates and Net Total.")} ${frappe._("Additional Discount is the separate invoice-level discount.")}`,
 );
+
+const posBreakdown = computed(() => {
+	const doc = props.invoice_doc;
+	if (!doc) return null;
+	const hasScPwd =
+		Number(doc.custom_sc_pwd_pax) > 0 ||
+		Number(doc.custom_sc_discount_amount) > 0 ||
+		Number(doc.custom_service_charge_amount) > 0;
+	if (!hasScPwd) return null;
+	return calculatePosBreakdownFromDoc(doc);
+});
 </script>
 
 <style scoped>
@@ -268,5 +344,56 @@ const discountHelpText = computed(
 .discount-help-trigger:focus-visible {
 	background: rgba(var(--v-theme-info), 0.14);
 	outline: none;
+}
+
+/* Philippine POS Breakdown */
+.pos-breakdown {
+	background: var(--pos-surface-raised, rgb(var(--v-theme-surface)));
+	border: 1px solid rgba(var(--v-border-color), 0.15);
+	border-radius: var(--pos-radius-sm, 8px);
+	padding: var(--pos-space-2, 8px) var(--pos-space-3, 12px);
+}
+
+.pos-breakdown__title {
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: rgba(var(--v-theme-on-surface), 0.6);
+	margin-bottom: var(--pos-space-2, 8px);
+}
+
+.pos-breakdown__row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 2px 0;
+	font-size: 0.88rem;
+}
+
+.pos-breakdown__row--indent {
+	padding-left: 1rem;
+	font-size: 0.82rem;
+	color: rgba(var(--v-theme-on-surface), 0.7);
+}
+
+.pos-breakdown__row--deduction {
+	color: rgb(var(--v-theme-error));
+}
+
+.pos-breakdown__row--total {
+	font-size: 1rem;
+	font-weight: 700;
+}
+
+.pos-breakdown__divider {
+	border-top: 1px dashed rgba(var(--v-border-color), 0.3);
+	margin: 4px 0;
+}
+
+.pos-breakdown__divider--thick {
+	border-top-width: 2px;
+	border-style: solid;
+	margin: 6px 0;
 }
 </style>

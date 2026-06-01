@@ -17,11 +17,56 @@ const round2 = (value: unknown): number => {
 
 /** Must match SERVICE_CHARGE_TAX_DESCRIPTION in posawesome.posawesome.api.invoice */
 const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
+const VAT_EXEMPT_TAX_DESCRIPTION = "VAT Exempt Adjustment";
+
+function isVatExemptTaxRow(tax: any): boolean {
+	return (
+		tax?.charge_type === "Actual" &&
+		tax?.description === VAT_EXEMPT_TAX_DESCRIPTION
+	);
+}
 
 function isServiceChargeTaxRow(tax: any): boolean {
 	return (
 		tax?.charge_type === "Actual" &&
 		tax?.description === SERVICE_CHARGE_TAX_DESCRIPTION
+	);
+}
+
+function buildVatExemptTaxRow(context: any, vatExemptAmount: number) {
+	if (!vatExemptAmount || vatExemptAmount === 0) return null;
+
+	const absAmount = Math.abs(vatExemptAmount);
+
+	const vatAccount = resolveVatOutputAccount(context);
+	if (!vatAccount) return null;
+
+	const conversionRate = context.conversion_rate || 1;
+	return {
+		account_head: vatAccount,
+		charge_type: "Actual",
+		description: VAT_EXEMPT_TAX_DESCRIPTION,
+		tax_amount: -absAmount,
+		included_in_print_rate: 0,
+		base_tax_amount: -absAmount * conversionRate,
+	};
+}
+
+function resolveVatOutputAccount(context: any): string | null {
+	const fallbackFromTaxes = () => {
+		const sourceTaxes = context?.invoice_doc?.taxes || [];
+		const vatRow = sourceTaxes.find(
+			(t: any) =>
+				t.charge_type === "On Net Total" &&
+				Number(t.rate) === 12 &&
+				t.account_head,
+		);
+		return vatRow?.account_head || null;
+	};
+
+	return (
+		context.company?.custom_default_vat_output_account ||
+		fallbackFromTaxes()
 	);
 }
 
@@ -357,7 +402,10 @@ export function get_invoice_doc(context: any) {
 
 		if (Array.isArray(doc.taxes)) {
 			doc.taxes = doc.taxes.filter(
-				(tax: any) => !isServiceChargeTaxRow(tax) && !isSpecialDiscountTaxRow(tax)
+				(tax: any) =>
+					!isServiceChargeTaxRow(tax) &&
+					!isSpecialDiscountTaxRow(tax) &&
+					!isVatExemptTaxRow(tax)
 			);
 		}
 	}
@@ -534,6 +582,8 @@ export function get_invoice_doc(context: any) {
 	}
 	doc.posa_service_charge = serviceCharge;
 	doc.custom_special_discount_amount = specialDiscountAmount;
+	const discountOnlyAmount = -scDiscountAbs;
+	const vatExemptOnlyAmount = -vatExemptAbs;
 
 	// Prepare taxes array
 	doc.taxes = [];
@@ -544,6 +594,9 @@ export function get_invoice_doc(context: any) {
 				return;
 			}
 			if (isSpecialDiscountTaxRow(tax)) {
+				return;
+			}
+			if (isVatExemptTaxRow(tax)) {
 				return;
 			}
 			if (tax.tax_amount) {
@@ -609,7 +662,16 @@ export function get_invoice_doc(context: any) {
 		}
 	}
 
-	grandTotal = appendDiscountTaxRows(doc, context, specialDiscountAmount, grandTotal);
+	grandTotal = appendDiscountTaxRows(doc, context, discountOnlyAmount, grandTotal);
+	const vatExemptRow = buildVatExemptTaxRow(context, vatExemptAbs);
+	if (vatExemptRow) {
+		doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+		doc.taxes.push(vatExemptRow);
+		doc.total_taxes_and_charges = flt(
+			(doc.total_taxes_and_charges || 0) + vatExemptRow.tax_amount,
+		);
+		grandTotal += vatExemptRow.tax_amount;
+	}
 	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
 	if (context.invoiceStore?.invoiceDoc) {
 		context.invoiceStore.invoiceDoc.taxes = [...doc.taxes];

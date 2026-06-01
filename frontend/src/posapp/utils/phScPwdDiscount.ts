@@ -307,3 +307,146 @@ export function clearPhScPwdDiscountFromDoc(
 		custom_original_total_taxes_and_charges: null,
 	};
 }
+
+// ---------------------------------------------------------------------------
+// Single source of truth – POS breakdown display
+// ---------------------------------------------------------------------------
+
+export type PosBreakdown = {
+	subtotal: number;
+	vatableSales: number;
+	vatExemptSales: number;
+	vatAmount: number;
+	serviceCharge: number;
+	seniorDiscount: number;
+	pwdDiscount: number;
+	totalDiscount: number;
+	vatExemptionAdjustment: number;
+	totalDeduction: number;
+	grandTotal: number;
+};
+
+/**
+ * Single source of truth for POS UI breakdown.
+ *
+ * Given an invoice doc and its pax metadata, returns the full set of
+ * computed values that exactly match the final posted POS Invoice.
+ *
+ * Call this function EVERYWHERE that displays totals:
+ *   - POS screen (InvoiceTotals / payment screen)
+ *   - Receipt / offline print template
+ *   - Before-submit preview
+ *   - After-submit invoice view
+ */
+export function calculatePosBreakdown(
+	items: InvoiceLine[],
+	totalPax: number,
+	scPax: number,
+	pwdPax: number = 0,
+	serviceChargeAmount?: number,
+): PosBreakdown | null {
+	const effectiveTotal = Math.max(1, Math.floor(Number(totalPax) || 1));
+	const senior = Math.max(0, Math.min(effectiveTotal, Math.floor(Number(scPax) || 0)));
+	const pwd = Math.max(0, Math.min(effectiveTotal - senior, Math.floor(Number(pwdPax) || 0)));
+	const regular = Math.max(0, effectiveTotal - senior - pwd);
+
+	if (!Array.isArray(items) || items.length === 0) {
+		return null;
+	}
+
+	let subtotal = 0;
+	let seniorShareTotal = 0;
+	let pwdShareTotal = 0;
+	let regularShareTotal = 0;
+
+	for (const item of items) {
+		const gross = lineGross(item);
+		if (!gross) continue;
+		subtotal += gross;
+		const perPax = gross / effectiveTotal;
+		seniorShareTotal += perPax * senior;
+		pwdShareTotal += perPax * pwd;
+		regularShareTotal += perPax * regular;
+	}
+
+	const seniorVatExclusive = seniorShareTotal / (1 + VAT_RATE);
+	const pwdVatExclusive = pwdShareTotal / (1 + VAT_RATE);
+	const regularVatExclusive = regularShareTotal / (1 + VAT_RATE);
+
+	const vatableSales = regularVatExclusive;
+	const vatExemptSales = seniorVatExclusive + pwdVatExclusive;
+	const vatAmount = vatableSales * VAT_RATE;
+
+	const seniorDiscount = seniorVatExclusive * 0.2;
+	const pwdDiscount = pwdVatExclusive * 0.2;
+
+	const vatExemptionAdjustment =
+		(seniorShareTotal + pwdShareTotal) - vatExemptSales;
+
+	const sc = serviceChargeAmount != null
+		? serviceChargeAmount
+		: computePhServiceCharge(subtotal, effectiveTotal, senior);
+
+	const grandTotal = round2(
+		subtotal + sc - seniorDiscount - pwdDiscount - vatExemptionAdjustment,
+	);
+
+	return {
+		subtotal: round2(subtotal),
+		vatableSales: round2(vatableSales),
+		vatExemptSales: round2(vatExemptSales),
+		vatAmount: round2(vatAmount),
+		serviceCharge: round2(sc),
+		seniorDiscount: round2(seniorDiscount),
+		pwdDiscount: round2(pwdDiscount),
+		totalDiscount: round2(seniorDiscount + pwdDiscount),
+		vatExemptionAdjustment: round2(vatExemptionAdjustment),
+		totalDeduction: round2(seniorDiscount + pwdDiscount + vatExemptionAdjustment),
+		grandTotal,
+	};
+}
+
+/**
+ * Convenience wrapper for `calculatePosBreakdown` that reads directly from an
+ * invoice doc (store / backend response) so any component can call it with
+ * `invoice` and get the breakdown without manually wiring pax values.
+ */
+export function calculatePosBreakdownFromDoc(
+	invoice: Record<string, any> | null | undefined,
+	serviceChargeAmount?: number,
+): PosBreakdown | null {
+	if (!invoice) return null;
+
+	const items = Array.isArray(invoice.items)
+		? invoice.items
+		: invoice.item_list
+			? invoice.item_list
+			: [];
+	if (items.length === 0) return null;
+
+	const totalPax = Math.floor(Number(invoice.custom_total_pax ?? invoice.custom_customer_count ?? 1)) || 1;
+	const scPax = Math.floor(Number(invoice.custom_sc_pwd_pax ?? 0)) || 0;
+
+	let seniorCount = scPax;
+	let pwdCount = 0;
+
+	const details = Array.isArray(invoice.custom_special_discount_details)
+		? invoice.custom_special_discount_details
+		: [];
+	if (details.length > 0) {
+		seniorCount = details.filter(
+			(r: any) => String(r.discount_type || "").trim() === "Senior Citizen",
+		).length;
+		pwdCount = details.filter(
+			(r: any) => String(r.discount_type || "").trim() === "PWD",
+		).length;
+	}
+
+	return calculatePosBreakdown(
+		items,
+		totalPax,
+		seniorCount,
+		pwdCount,
+		serviceChargeAmount ?? invoice.posa_service_charge ?? invoice.custom_service_charge_amount,
+	);
+}

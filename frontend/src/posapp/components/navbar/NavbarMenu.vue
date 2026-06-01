@@ -440,6 +440,14 @@ export default {
 					tone: "info",
 					handler: "syncInvoices",
 				},
+				{
+					id: "kitchen-display",
+					label: __("Kitchen Display"),
+					subtitle: __("View and mark open kitchen orders"),
+					icon: "mdi-silverware-fork-knife",
+					tone: "warning",
+					handler: "openKitchenDisplay",
+				},
 				this.showXzReadings
 					? {
 							id: "x-reading",
@@ -519,6 +527,14 @@ export default {
 									handler: "openCustomerDisplay",
 								}
 							: null,
+						{
+							id: "kitchen-display-settings",
+							label: __("Open Kitchen Display"),
+							subtitle: __("Mark open orders as served"),
+							icon: "mdi-silverware-fork-knife",
+							tone: "warning",
+							handler: "openKitchenDisplay",
+						},
 						this.isEnabledSetting(this.posProfile?.posa_silent_print)
 							? {
 									id: "qz-tray-setup",
@@ -689,6 +705,10 @@ export default {
 					this.closeMenu();
 					this.$emit("open-customer-display");
 					break;
+				case "openKitchenDisplay":
+					this.closeMenu();
+					this.openKitchenDisplay();
+					break;
 				case "openQzTraySetup":
 					this.closeMenu();
 					this.showQzTrayDialog = true;
@@ -723,6 +743,9 @@ export default {
 		},
 		openDashboard() {
 			window.location.href = "/app/posapp/dashboard";
+		},
+		openKitchenDisplay() {
+			this.$router.push({ path: "/kitchen" });
 		},
 		initializeWesternNumerals() {
 			try {

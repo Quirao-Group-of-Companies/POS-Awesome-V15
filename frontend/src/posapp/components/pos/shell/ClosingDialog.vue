@@ -115,7 +115,7 @@ export default {
 			formatCurrencyWithSymbol: (amount, currency) => {
 				const resolvedCurrency = currency || "";
 				const symbol = currencySymbol(resolvedCurrency);
-				const formatted = formatCurrency(amount || 0);
+				const formatted = window.flt(amount || 0, 2).toLocaleString();
 				if (symbol) return `${symbol} ${formatted}`;
 				return `${resolvedCurrency} ${formatted}`.trim();
 			},
@@ -126,7 +126,6 @@ export default {
 		};
 
 		const summary = useClosingSummary(overview, pos_profile, dialog_data, summaryFormatters);
-
 		const headers = ref([]);
 		const baseHeaders = [
 			{

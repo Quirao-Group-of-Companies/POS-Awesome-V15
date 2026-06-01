@@ -145,6 +145,7 @@ export default {
 				}
 				return;
 			}
+			if (!this.pos_profile?.company) return;
 			const vm = this;
 			frappe.call({
 				method: "posawesome.posawesome.api.offers.get_pos_coupon",
@@ -180,6 +181,7 @@ export default {
 		},
 		setActiveGiftCoupons() {
 			if (!this.customer) return;
+			if (!this.pos_profile?.company) return;
 			const vm = this;
 			frappe.call({
 				method: "posawesome.posawesome.api.offers.get_active_gift_coupons",

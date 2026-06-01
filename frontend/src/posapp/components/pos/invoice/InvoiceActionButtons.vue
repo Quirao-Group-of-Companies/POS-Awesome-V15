@@ -8,12 +8,12 @@
 					color="warning"
 					theme="dark"
 					size="large"
-					prepend-icon="mdi-content-save"
+					prepend-icon="mdi-bell-ring-outline"
 					class="summary-btn restaurant-save-btn"
 					:loading="saveLoading"
 					@click="$emit('save-order')"
 				>
-					{{ __("Save Order") }}
+					{{ __("Send to Kitchen") }}
 				</v-btn>
 			</v-col>
 			<v-col cols="12" sm="5">
@@ -39,12 +39,12 @@
 					color="warning"
 					theme="dark"
 					size="large"
-					prepend-icon="mdi-content-save"
+					prepend-icon="mdi-bell-ring-outline"
 					class="summary-btn restaurant-save-btn"
 					:loading="saveLoading"
 					@click="$emit('save-order')"
 				>
-					{{ __("Save Order") }}
+					{{ __("Send to Kitchen") }}
 				</v-btn>
 			</v-col>
 			<v-col cols="6">

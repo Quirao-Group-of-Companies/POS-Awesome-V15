@@ -46,8 +46,10 @@ class TestRestaurantApi(unittest.TestCase):
                 "restaurant_table": "P-1",
                 "restaurant_table_label": "P-1",
                 "restaurant_floor": "PALUTO",
+                "creation": "2026-05-19 09:55:00",
                 "docstatus": 0,
                 "modified": "2026-05-19 10:00:00",
+                "grand_total": 1500,
                 "outstanding_amount": 100,
             }
         ]
@@ -59,6 +61,8 @@ class TestRestaurantApi(unittest.TestCase):
 
         self.assertEqual(result["tables"]["P-1"]["status"], "Occupied")
         self.assertEqual(result["tables"]["P-1"]["invoice_name"], "POS-INV-001")
+        self.assertEqual(result["tables"]["P-1"]["grand_total"], 1500.0)
+        self.assertEqual(result["tables"]["P-1"]["creation"], "2026-05-19 09:55:00")
 
     def test_paid_submitted_invoice_frees_table(self):
         self.restaurant.frappe.get_all = lambda *args, **kwargs: [
@@ -67,8 +71,10 @@ class TestRestaurantApi(unittest.TestCase):
                 "restaurant_table": "P-2",
                 "restaurant_table_label": "P-2",
                 "restaurant_floor": "",
+                "creation": "2026-05-19 10:55:00",
                 "docstatus": 1,
                 "modified": "2026-05-19 11:00:00",
+                "grand_total": 800,
                 "outstanding_amount": 0,
             }
         ]
@@ -87,8 +93,10 @@ class TestRestaurantApi(unittest.TestCase):
                 "restaurant_table": "P-3",
                 "restaurant_table_label": "P-3",
                 "restaurant_floor": "",
+                "creation": "2026-05-19 11:55:00",
                 "docstatus": 1,
                 "modified": "2026-05-19 12:00:00",
+                "grand_total": 500,
                 "outstanding_amount": 50,
             }
         ]
@@ -107,8 +115,10 @@ class TestRestaurantApi(unittest.TestCase):
                 "restaurant_table": "P-4",
                 "restaurant_table_label": "P-4",
                 "restaurant_floor": "",
+                "creation": "2026-05-19 12:55:00",
                 "docstatus": 1,
                 "modified": "2026-05-19 13:00:00",
+                "grand_total": 200,
                 "outstanding_amount": 20,
             },
             {
@@ -116,8 +126,10 @@ class TestRestaurantApi(unittest.TestCase):
                 "restaurant_table": "P-4",
                 "restaurant_table_label": "P-4",
                 "restaurant_floor": "",
+                "creation": "2026-05-19 13:55:00",
                 "docstatus": 0,
                 "modified": "2026-05-19 14:00:00",
+                "grand_total": 100,
                 "outstanding_amount": 10,
             },
         ]

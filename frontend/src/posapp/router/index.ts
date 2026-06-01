@@ -13,11 +13,22 @@ import OfflineRouteUnavailable from "../components/system/OfflineRouteUnavailabl
 const OFFLINE_ROUTE_UNAVAILABLE_NAME = "offline-route-unavailable";
 
 const routes = [
-	{ path: "/", redirect: "/pos" },
+	// POS Awesome landing: restaurant tables dashboard.
+	// We still support direct `/pos` access for table sessions via query params.
+	{ path: "/", redirect: "/tables" },
 	{
 		path: "/pos",
 		component: () => import("../components/pos/shell/Pos.vue"),
 		meta: { title: "POS", layout: "default", loadingMessage: "Loading POS..." },
+		beforeEnter: (to) => {
+			// When opening POS Awesome from the desk, we want Tables first.
+			// Allow table sessions to deep-link into `/pos` (table_id query).
+			const tableId = to?.query?.table_id;
+			if (typeof tableId === "string" && tableId.trim()) {
+				return true;
+			}
+			return { path: "/tables" };
+		},
 	},
 	{
 		path: "/orders",
@@ -98,6 +109,15 @@ const routes = [
 			title: "Customer Display",
 			layout: "display",
 			loadingMessage: "Loading customer display...",
+		},
+	},
+	{
+		path: "/kitchen",
+		component: () => import("../../views/KitchenView.vue"),
+		meta: {
+			title: "Kitchen Display",
+			layout: "display",
+			loadingMessage: "Loading kitchen display...",
 		},
 	},
 	{

@@ -157,6 +157,8 @@ export function useClosingShift(eventBus: any) {
 
 		const normalize = (payload: any = {}) => ({
 			total_invoices: toNumber(payload.total_invoices),
+			total_service_charges: toNumber(payload.total_service_charges),
+			total_special_discount: toNumber(payload.total_special_discount),
 			company_currency:
 				payload.company_currency || posProfileCurrency || "",
 			company_currency_total: toNumber(payload.company_currency_total),

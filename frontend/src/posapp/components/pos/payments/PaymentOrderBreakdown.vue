@@ -35,27 +35,32 @@
 				</thead>
 				<tbody>
 					<tr
-						v-for="line in orderLines"
-						:key="line.key"
+						v-for="row in orderLines"
+						:key="row.key"
 						class="payment-order-breakdown__row"
 					>
 						<td
 							class="text-start align-middle px-4 py-3 payment-order-breakdown__name"
 							style="width: 60%"
 						>
-							{{ line.name }}
+							<div class="font-weight-bold">
+								{{ row.item?.item_name || row.item?.item_code || __("Item") }}
+							</div>
+							<div class="text-caption text-medium-emphasis pl-2 payment-order-breakdown__vat-subline">
+								{{ __("VAT (12%)") }}: {{ row.vatDisplay }}
+							</div>
 						</td>
 						<td
 							class="text-end align-middle px-4 py-3 payment-order-breakdown__qty-col"
 							style="width: 20%"
 						>
-							{{ line.qtyDisplay }}
+							{{ row.qtyDisplay }}
 						</td>
 						<td
 							class="text-end align-middle px-4 py-3 payment-order-breakdown__amount"
 							style="width: 20%"
 						>
-							{{ line.amountDisplay }}
+							{{ row.amountDisplay }}
 						</td>
 					</tr>
 				</tbody>
@@ -107,6 +112,23 @@ const resolveLineAmount = (item) => {
 	return flt(item?.qty) * flt(item?.rate);
 };
 
+function formatVat(value) {
+	const num = flt(value);
+	return num.toFixed(2);
+}
+
+function getItemVatNumeric(item) {
+	const grossAmount = resolveLineAmount(item);
+	if (!grossAmount) return 0;
+
+	// Extract the 12% inclusive VAT component
+	return flt(grossAmount - grossAmount / 1.12);
+}
+
+function getItemVatAmount(item) {
+	return formatVat(getItemVatNumeric(item));
+}
+
 const resolveLineKey = (item, index) => {
 	return (
 		item?.posa_row_id ||
@@ -128,9 +150,10 @@ const orderLines = computed(() => {
 
 			return {
 				key: resolveLineKey(item, index),
-				name: item.item_name || item.item_code || __("Item"),
+				item,
 				qtyDisplay: formatQty(qty),
 				amountDisplay: props.formatCurrency(amount, currency),
+				vatDisplay: props.formatCurrency(getItemVatNumeric(item), currency),
 			};
 		});
 });
@@ -208,6 +231,13 @@ function formatQty(qty) {
 	color: var(--pos-text-primary, #fff);
 }
 
+.payment-order-breakdown__vat-subline {
+	display: block;
+	margin-top: 2px;
+	line-height: 1.25;
+	opacity: 0.82;
+}
+
 .payment-order-breakdown__qty-col {
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
@@ -223,5 +253,9 @@ function formatQty(qty) {
 
 .payment-order-breakdown__empty {
 	font-size: 0.875rem;
+}
+
+.payment-order-breakdown__note {
+	line-height: 1.15;
 }
 </style>

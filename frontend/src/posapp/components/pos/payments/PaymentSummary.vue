@@ -7,7 +7,7 @@
 				:label="frappe._('Paid Amount')"
 				class="sleek-field pos-themed-input"
 				hide-details
-				:model-value="total_payments_display"
+				:model-value="invoice_doc?.total || 0"
 				readonly
 				:prefix="currencySymbol(invoice_doc.currency)"
 				density="compact"

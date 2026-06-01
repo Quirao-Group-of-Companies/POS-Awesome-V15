@@ -122,15 +122,19 @@
 				persistent-placeholder
 			></v-text-field>
 		</v-col>
-		<v-col cols="12" sm="6">
+		<v-col
+			v-if="uiStore.posProfile?.custom_enable_service_charge === 1"
+			cols="12"
+			sm="6"
+		>
 			<v-text-field
 				density="compact"
 				variant="solo"
 				color="primary"
-				:label="frappe._('Grand Total')"
+				:label="frappe._('Service Charge (5%)')"
 				class="sleek-field pos-themed-input"
 				hide-details
-				:model-value="formatCurrency(invoice_doc.grand_total)"
+				:model-value="formatCurrency(serviceChargeAmount, displayCurrency)"
 				readonly
 				:prefix="currencySymbol(invoice_doc.currency)"
 				persistent-placeholder
@@ -144,7 +148,7 @@
 				:label="frappe._('Special Discount')"
 				class="sleek-field pos-themed-input"
 				hide-details
-				:model-value="formatCurrency(invoice_doc.custom_special_discount_amount)"
+				:model-value="formatCurrency(specialDiscountDisplay)"
 				readonly
 				:prefix="currencySymbol(invoice_doc.currency)"
 				persistent-placeholder
@@ -169,6 +173,11 @@
 
 <script setup>
 import { computed } from "vue";
+import { useInvoiceStore } from "../../../stores/invoiceStore.js";
+import { useUIStore } from "../../../stores/uiStore.js";
+
+const invoiceStore = useInvoiceStore();
+const uiStore = useUIStore();
 
 const props = defineProps({
 	invoice_doc: Object,
@@ -185,15 +194,36 @@ const props = defineProps({
 
 const frappe = window.frappe;
 
+const serviceChargeAmount = computed(() =>
+	Number(invoiceStore.invoiceDoc?.custom_service_charge_amount || 0),
+);
+
 const toNumber = (value) => {
 	const parsed = Number(value || 0);
 	return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const totalDiscountAmount = computed(
-	() =>
-		Math.abs(toNumber(props.itemDiscountTotal)) + Math.abs(toNumber(props.invoice_doc?.discount_amount)),
-);
+const totalDiscountAmount = computed(() => {
+	const additional = Math.abs(toNumber(props.invoice_doc?.discount_amount));
+	const itemDisc = Math.abs(toNumber(props.itemDiscountTotal));
+	// Prefer invoice-level additional discount when set (includes SC/PWD total deduction).
+	if (additional > 0) {
+		return itemDisc + additional;
+	}
+	const scPwd =
+		Math.abs(toNumber(props.invoice_doc?.custom_sc_discount_amount)) +
+		Math.abs(toNumber(props.invoice_doc?.custom_vat_exempt_amount));
+	return itemDisc + scPwd;
+});
+
+const specialDiscountDisplay = computed(() => {
+	const sc = Math.abs(toNumber(props.invoice_doc?.custom_sc_discount_amount));
+	const vat = Math.abs(toNumber(props.invoice_doc?.custom_vat_exempt_amount));
+	if (sc > 0 || vat > 0) {
+		return sc + vat;
+	}
+	return Math.abs(toNumber(props.invoice_doc?.custom_special_discount_amount));
+});
 
 const discountHelpText = computed(
 	() =>

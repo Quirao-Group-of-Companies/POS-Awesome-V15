@@ -60,6 +60,46 @@ describe("api envelope handling", () => {
 		});
 	});
 
+	it("normalizes frappe validation failures from the error callback", async () => {
+		const stockPayload = {
+			errors: [
+				{
+					item_code: "ADB-7UP",
+					item_name: "7 UP",
+					warehouse: "Fruits/Vegetables - PSB",
+					requested_qty: 3,
+					available_qty: 0,
+					policy: "block",
+				},
+			],
+		};
+		(frappe.call as any).mockImplementation(({ error }: any) => {
+			error({
+				responseJSON: {
+					exc_type: "ValidationError",
+					exc: "ValidationError",
+					_server_messages: JSON.stringify([
+						JSON.stringify({
+							message: JSON.stringify(stockPayload),
+							title: "Message",
+						}),
+					]),
+				},
+			});
+		});
+
+		const result = await api.callEnvelope("pos.test.stock_error");
+
+		expect(result).toMatchObject({
+			ok: false,
+			error: {
+				code: "INSUFFICIENT_STOCK",
+				retryable: false,
+			},
+		});
+		expect(result.ok === false && result.error.message).toContain("ADB-7UP");
+	});
+
 	it("normalizes business-rule responses into non-retryable envelopes", async () => {
 		(frappe.call as any).mockImplementation(({ callback }: any) => {
 			callback({

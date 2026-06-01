@@ -118,11 +118,6 @@ export const initializePaymentLinesForDialog = (
 		}
 	});
 
-	preferredPayment.amount = normalizedTotal;
-	if (preferredPayment.base_amount !== undefined) {
-		preferredPayment.base_amount = normalizedTotal * conversionRate;
-	}
-
 	return preferredPayment;
 };
 

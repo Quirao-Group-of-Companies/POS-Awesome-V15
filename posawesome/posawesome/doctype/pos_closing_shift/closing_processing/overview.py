@@ -77,6 +77,19 @@ def get_closing_shift_overview(pos_opening_shift):
     cash_movement_company_currency_total = 0
     cash_movement_totals_by_type = {}
     cash_movement_totals_by_currency = {}
+    
+    if doctype == "POS Invoice":
+        invoices = frappe.get_all(
+            "POS Invoice",
+            filters = {
+                "docstatus": 1,
+                "posa_pos_opening_shift": pos_opening_shift,
+            },
+            fields=["posa_service_charge", "custom_special_discount_amount"]
+        )
+
+    total_service_charges = flt(sum(inv.posa_service_charge for inv in invoices)) or 0
+    total_special_discount = flt(sum(inv.custom_special_discount_amount for inv in invoices)) or 0
 
     cash_mode_of_payment = frappe.db.get_value("POS Profile", pos_profile, "posa_cash_mode_of_payment")
     if not cash_mode_of_payment:
@@ -697,6 +710,8 @@ def get_closing_shift_overview(pos_opening_shift):
             "by_currency": prepare_currency_rows(cash_movement_totals_by_currency),
             "by_type": prepare_movement_type_rows(cash_movement_totals_by_type),
         },
+        "total_service_charges": total_service_charges,
+        "total_special_discount": total_special_discount, 
     }
 
 

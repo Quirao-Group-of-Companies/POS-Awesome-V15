@@ -105,7 +105,29 @@ function getServerTime(response: any): string | null {
 	);
 }
 
+function extractStockErrorsMessage(value: unknown): string | null {
+	if (typeof value !== "string" || !value.trim()) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(value);
+		if (Array.isArray(parsed?.errors) && parsed.errors.length) {
+			return value;
+		}
+	} catch {
+		/* not stock JSON */
+	}
+	return null;
+}
+
 function extractServerMessage(payload: any): string | null {
+	const directStockMessage =
+		extractStockErrorsMessage(payload?.message) ||
+		extractStockErrorsMessage(payload?.exc);
+	if (directStockMessage) {
+		return directStockMessage;
+	}
+
 	const serverMessages =
 		payload?._server_messages || payload?.server_messages;
 	if (!serverMessages) {
@@ -117,8 +139,18 @@ function extractServerMessage(payload: any): string | null {
 		if (Array.isArray(parsed) && parsed.length) {
 			const first = parsed[0];
 			if (typeof first === "string") {
+				const stockMessage = extractStockErrorsMessage(first);
+				if (stockMessage) {
+					return stockMessage;
+				}
 				try {
 					const messageObject = JSON.parse(first);
+					const nestedStockMessage = extractStockErrorsMessage(
+						messageObject.message,
+					);
+					if (nestedStockMessage) {
+						return nestedStockMessage;
+					}
 					return (
 						messageObject.message || messageObject.title || first
 					);
@@ -133,6 +165,17 @@ function extractServerMessage(payload: any): string | null {
 	}
 
 	return null;
+}
+
+function businessFailureFromFrappeError<T>(
+	error: any,
+	requestId: string,
+): ApiEnvelope<T> | null {
+	const payload = error?.responseJSON || error?.xhr?.responseJSON;
+	if (!payload?.exc && !payload?._server_messages) {
+		return null;
+	}
+	return normalizeBusinessFailure<T>(payload, requestId);
 }
 
 function normalizeMessage(value: unknown, fallback: string) {
@@ -401,6 +444,14 @@ const api = {
 						);
 					},
 					error: (error: any) => {
+						const businessFailure = businessFailureFromFrappeError<T>(
+							error,
+							requestId,
+						);
+						if (businessFailure) {
+							settle(businessFailure);
+							return;
+						}
 						settle(normalizeTransportFailure<T>(error, requestId));
 					},
 				});

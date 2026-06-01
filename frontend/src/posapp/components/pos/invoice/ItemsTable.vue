@@ -55,8 +55,6 @@
 					@add-one="addOne"
 					@calc-uom="calcUom"
 					@update-rate="handleRateUpdate"
-					@update-discount-percent="handleDiscountPercentUpdate"
-					@update-discount-amount="handleDiscountAmountUpdate"
 					@open-name-dialog="openNameDialog"
 					@reset-item-name="resetItemName"
 					@toggle-offer="toggleOffer"
@@ -309,20 +307,6 @@ const handleQtyUpdate = (item: any, newQty: any) => {
 const handleRateUpdate = (item: any, newRate: any) => {
 	props.setFormatedCurrency(item, "rate", null, false, { target: { value: newRate } });
 	props.calcPrices(item, newRate, { target: { id: "rate" } });
-};
-
-const handleDiscountPercentUpdate = (item: any, newDiscount: any) => {
-	props.setFormatedCurrency(item, "discount_percentage", null, false, {
-		target: { value: newDiscount },
-	});
-	props.calcPrices(item, newDiscount, { target: { id: "discount_percentage" } });
-};
-
-const handleDiscountAmountUpdate = (item: any, newDiscount: any) => {
-	props.setFormatedCurrency(item, "discount_amount", null, false, {
-		target: { value: newDiscount },
-	});
-	props.calcPrices(item, newDiscount, { target: { id: "discount_amount" } });
 };
 
 const focusItemField = (index: number, field: CartShortcutField) => {

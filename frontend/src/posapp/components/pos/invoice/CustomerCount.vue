@@ -25,14 +25,12 @@ const invoiceStore = useInvoiceStore();
 const count = ref(invoiceStore.invoiceDoc?.custom_customer_count || 1);
 
 watch(count, (val) => {
-	if (invoiceStore.invoiceDoc) {
-		invoiceStore.invoiceDoc.custom_customer_count = val;
-	} else {
-		invoiceStore.$patch((state) => {
-			if (!state.invoiceDoc) state.invoiceDoc = {};
-			state.invoiceDoc.custom_customer_count = val;
-		});
+	const next = Math.max(1, Math.floor(Number(val) || 1));
+	if (next !== val) {
+		count.value = next;
+		return;
 	}
+	invoiceStore.mergeInvoiceDoc({ custom_customer_count: next });
 });
 
 watch(

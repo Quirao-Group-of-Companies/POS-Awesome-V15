@@ -19,7 +19,9 @@ def get_pos_coupon(coupon, customer, company):
 
 
 @frappe.whitelist()
-def get_active_gift_coupons(customer, company):
+def get_active_gift_coupons(customer, company=None):
+    if not company:
+        return []
     coupons = []
     today = getdate(nowdate())
     coupons_data = frappe.get_all(

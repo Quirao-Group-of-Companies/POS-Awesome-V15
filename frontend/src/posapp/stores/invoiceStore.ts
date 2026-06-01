@@ -381,6 +381,92 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		additionalDiscountPercentage.value = toNumber(val);
 	};
 
+	/**
+	 * Philippine Senior Citizen / PWD prorated discount calculator.
+	 *
+	 * Assumptions:
+	 * - Item `amount` is VAT-inclusive at 12%.
+	 * - Discount is applied as an invoice-level absolute deduction on Grand Total to avoid
+	 *   mutating ERPNext tax rows from the frontend.
+	 *
+	 * Writes:
+	 * - `custom_total_pax`, `custom_sc_pwd_pax`, `custom_sc_name`, `custom_sc_id_number`
+	 * - `custom_vat_exempt_amount`, `custom_sc_discount_amount`
+	 * - adjusts `discount_amount` (Additional Discount) by removing the previously applied
+	 *   SC/PWD total and adding the newly computed total.
+	 */
+	const calculateSeniorDiscount = (
+		totalPax: any,
+		scPax: any,
+		meta: { name?: string; idNumber?: string } = {},
+	) => {
+		const doc = invoiceDoc.value ? { ...invoiceDoc.value } : ({} as PartialInvoiceDoc);
+		const total = Math.max(1, Math.floor(toNumber(totalPax) || 1));
+		const sc = Math.max(0, Math.min(total, Math.floor(toNumber(scPax) || 0)));
+
+		// Guard: nothing to apply
+		if (sc <= 0) {
+			mergeInvoiceDoc({
+				custom_total_pax: total,
+				custom_sc_pwd_pax: sc,
+				custom_sc_name: (meta.name || "").trim(),
+				custom_sc_id_number: (meta.idNumber || "").trim(),
+				custom_vat_exempt_amount: 0,
+				custom_sc_discount_amount: 0,
+			});
+			return { vatExemptTotal: 0, scDiscountTotal: 0, totalDeduction: 0 };
+		}
+
+		const ratio = sc / total;
+		const VAT_RATE = 0.12;
+
+		let vatExemptTotal = 0;
+		let scDiscountTotal = 0;
+
+		for (const item of items.value) {
+			if (!item) continue;
+			// Use `amount` when available; otherwise fall back to qty * rate.
+			const grossAmount = toNumber(item.amount) || toNumber(item.qty) * toNumber(item.rate);
+			if (!grossAmount) continue;
+
+			const seniorShare = grossAmount * ratio;
+			const netOfVat = seniorShare / (1 + VAT_RATE);
+
+			const vatExempt = seniorShare - netOfVat;
+			const scDiscount = netOfVat * 0.2;
+
+			vatExemptTotal += vatExempt;
+			scDiscountTotal += scDiscount;
+		}
+
+		// Round to 2 decimals for currency stability.
+		const round2 = (n: number) => Math.round((toNumber(n) + Number.EPSILON) * 100) / 100;
+		vatExemptTotal = round2(vatExemptTotal);
+		scDiscountTotal = round2(scDiscountTotal);
+		const totalDeduction = round2(vatExemptTotal + scDiscountTotal);
+
+		// Remove previously-applied SC/PWD deduction (if any) to keep the action idempotent.
+		const previousDeduction =
+			round2(toNumber(doc.custom_vat_exempt_amount) + toNumber(doc.custom_sc_discount_amount));
+		const baseDiscountAmount = round2(toNumber(doc.discount_amount) - previousDeduction);
+		const nextDiscountAmount = round2(baseDiscountAmount + totalDeduction);
+
+		mergeInvoiceDoc({
+			custom_total_pax: total,
+			custom_sc_pwd_pax: sc,
+			custom_sc_name: (meta.name || "").trim(),
+			custom_sc_id_number: (meta.idNumber || "").trim(),
+			custom_vat_exempt_amount: vatExemptTotal,
+			custom_sc_discount_amount: scDiscountTotal,
+			// ERPNext "Additional Discount" field
+			discount_amount: nextDiscountAmount,
+			// Make the intent explicit for ERPNext calculation order.
+			apply_discount_on: "Grand Total",
+		});
+
+		return { vatExemptTotal, scDiscountTotal, totalDeduction };
+	};
+
 	/** Replaces the delivery-charge list. Non-array values are coerced to `[]`. */
 	const setDeliveryCharges = (val: any) => {
 		deliveryCharges.value = Array.isArray(val) ? val : [];
@@ -816,6 +902,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		setDiscountAmount,
 		setAdditionalDiscount,
 		setAdditionalDiscountPercentage,
+		calculateSeniorDiscount,
 		setDeliveryCharges,
 		setDeliveryChargesRate,
 		setSelectedDeliveryCharge,

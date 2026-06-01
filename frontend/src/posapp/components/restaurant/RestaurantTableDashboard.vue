@@ -44,7 +44,7 @@
 				<v-card
 					class="table-card"
 					:class="`status-${table.statusKey}`"
-					:style="{ backgroundColor: statusColor(table.status) }"
+					:style="tableCardStyle(table)"
 					elevation="4"
 					@click="selectTable(table)"
 				>
@@ -57,6 +57,14 @@
 					<div class="table-status">
 						{{ table.status }}
 					</div>
+					<div v-if="table.status !== 'Vacant' && table.entry" class="table-meta">
+						<div class="table-total">
+							{{ getGrandTotalLabel(table.entry) }}
+						</div>
+						<div class="table-elapsed">
+							{{ getElapsedLabel(table.entry) }}
+						</div>
+					</div>
 				</v-card>
 			</v-col>
 		</v-row>
@@ -64,10 +72,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useRouter } from "vue-router";
 import { useInvoiceStore } from "@/posapp/stores/invoiceStore";
+import { useFormat } from "@/posapp/format";
 import { useUIStore } from "../../stores/uiStore.js";
 import { ensurePosProfile } from "../../../utils/pos_profile";
 import {
@@ -91,17 +100,21 @@ type RestaurantTable = {
 	floor: string;
 	status: RestaurantTableStatus;
 	statusKey: string;
+	entry?: RestaurantTableStatusEntry | null;
 };
 
 const router = useRouter();
 const invoiceStore = useInvoiceStore();
 const uiStore = useUIStore();
 const { posProfile } = storeToRefs(uiStore);
+const { formatCurrency, currencySymbol } = useFormat();
 
 const selectedFloor = ref("PALUTO");
 const floors = ref(["PALUTO"]);
 const tableStatuses = ref<Record<string, RestaurantTableStatus>>({});
 const tableStatusDetails = ref<RestaurantTableStatusMap>({});
+const nowTick = ref(Date.now());
+let elapsedTimer: number | null = null;
 
 const legend = [
 	{ label: "VACANT", status: "Vacant" as RestaurantTableStatus },
@@ -159,6 +172,14 @@ function resolveTableStatus(label: string): RestaurantTableStatus {
 	);
 }
 
+function resolveTableEntry(label: string): RestaurantTableStatusEntry | null {
+	return findRestaurantTableStatusEntry(
+		tableStatusDetails.value,
+		label,
+		label,
+	);
+}
+
 const displayTables = computed(() => {
 	return Array.from({ length: tableSlotCount.value }, (_, index) => {
 		const label = `P-${index + 1}`;
@@ -170,6 +191,7 @@ const displayTables = computed(() => {
 			floor: selectedFloor.value,
 			status,
 			statusKey: statusKey(status),
+			entry: resolveTableEntry(label),
 		};
 	});
 });
@@ -185,7 +207,64 @@ function statusColor(status: RestaurantTableStatus) {
 	if (status === "Bill-Cut") {
 		return "#2e8b57";
 	}
-	return "#9a5a24";
+	return "#2a2f36";
+}
+
+const displayCurrency = computed(() => {
+	const p = posProfile.value as Record<string, unknown> | null;
+	return (
+		(p?.currency as string) ||
+		(frappe?.boot?.sysdefaults?.currency as string) ||
+		""
+	);
+});
+
+const displayCurrencySymbol = computed(() => {
+	const cur = displayCurrency.value;
+	return cur ? currencySymbol(cur) : "";
+});
+
+function tableCardStyle(table: RestaurantTable): Record<string, string> {
+	if (table.status === "Occupied" || table.status === "Bill-Cut") {
+		return { backgroundColor: statusColor(table.status) };
+	}
+	return {};
+}
+
+function getElapsedLabel(entry: RestaurantTableStatusEntry | null): string {
+	if (!entry) return "";
+	const raw = entry.creation || entry.modified || "";
+	const parsed = raw ? new Date(raw).getTime() : NaN;
+	if (!Number.isFinite(parsed)) return "";
+
+	const minutes = Math.max(0, Math.floor((nowTick.value - parsed) / 60_000));
+	if (minutes < 60) return `${minutes}m`;
+	const hours = Math.floor(minutes / 60);
+	const rem = minutes % 60;
+	return rem ? `${hours}h ${rem}m` : `${hours}h`;
+}
+
+function getGrandTotalLabel(entry: RestaurantTableStatusEntry | null): string {
+	if (!entry) return "";
+	const total = Number(entry.grand_total || 0);
+	if (!Number.isFinite(total) || total <= 0) return "";
+	const formatted = formatCurrency(total);
+	const symbol = displayCurrencySymbol.value;
+	return symbol ? `${symbol} ${formatted}` : formatted;
+}
+
+function startElapsedTimer() {
+	stopElapsedTimer();
+	elapsedTimer = window.setInterval(() => {
+		nowTick.value = Date.now();
+	}, 60_000);
+}
+
+function stopElapsedTimer() {
+	if (elapsedTimer) {
+		window.clearInterval(elapsedTimer);
+		elapsedTimer = null;
+	}
 }
 
 function applyTableStatusMap(statusMap: RestaurantTableStatusMap) {
@@ -224,15 +303,17 @@ async function fetchTables() {
 }
 
 onMounted(() => {
+	nowTick.value = Date.now();
+	startElapsedTimer();
 	fetchTables();
 });
 
+onBeforeUnmount(() => {
+	stopElapsedTimer();
+});
+
 function getTableStatusEntry(table: RestaurantTable): RestaurantTableStatusEntry | null {
-	return findRestaurantTableStatusEntry(
-		tableStatusDetails.value,
-		table.name,
-		table.label,
-	);
+	return table.entry || null;
 }
 
 async function selectTable(table: RestaurantTable) {
@@ -345,7 +426,7 @@ async function selectTable(table: RestaurantTable) {
 
 .table-card {
 	width: 82px;
-	height: 58px;
+	height: 66px;
 	border-radius: 6px;
 	cursor: pointer;
 	color: #fff;
@@ -361,6 +442,20 @@ async function selectTable(table: RestaurantTable) {
 		transform 0.15s ease,
 		box-shadow 0.15s ease,
 		filter 0.15s ease;
+}
+
+.status-vacant {
+	background: rgba(255, 255, 255, 0.035);
+	border-color: rgba(255, 255, 255, 0.08);
+	opacity: 0.55;
+	box-shadow: none;
+}
+
+.status-vacant:hover {
+	opacity: 0.7;
+	transform: translateY(-1px);
+	filter: none;
+	box-shadow: none;
 }
 
 .table-card:hover {
@@ -387,6 +482,30 @@ async function selectTable(table: RestaurantTable) {
 	margin-top: 3px;
 }
 
+.table-meta {
+	margin-top: 2px;
+	display: flex;
+	gap: 4px;
+	align-items: center;
+	font-size: 9px;
+	line-height: 1;
+	opacity: 0.92;
+}
+
+.table-total {
+	font-weight: 800;
+	white-space: nowrap;
+	max-width: 64px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.table-elapsed {
+	font-weight: 700;
+	opacity: 0.85;
+	white-space: nowrap;
+}
+
 .status-occupied {
 	box-shadow:
 		0 0 0 1px rgba(44, 150, 255, 0.45),
@@ -402,7 +521,7 @@ async function selectTable(table: RestaurantTable) {
 @media (max-width: 960px) {
 	.table-card {
 		width: 76px;
-		height: 56px;
+		height: 64px;
 	}
 }
 </style>

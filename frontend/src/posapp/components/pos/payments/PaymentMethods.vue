@@ -28,7 +28,7 @@
 						:label="frappe._('Amount')"
 						:class="['sleek-field pos-themed-input', isReturn ? 'pos-themed-input--refund' : '']"
 						hide-details
-						:model-value="formatCurrency(payment.amount)"
+						:model-value="formatCurrency(total)"
 						@change="$emit('update-amount', payment, $event)"
 						:rules="[isNumber]"
 						:prefix="currencySymbol(currency)"
@@ -192,6 +192,8 @@ const __ = window.__;
 const props = defineProps({
 	payments: Array,
 	currency: String,
+	grandTotal: { type: Number, default: 0 },
+	total: { type: Number, default: 0 },
 	isReturn: Boolean,
 	requestPaymentField: Boolean,
 	currencySymbol: Function,

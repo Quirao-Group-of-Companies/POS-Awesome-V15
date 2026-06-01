@@ -3,8 +3,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
 
 import InvoiceTotals from "../src/posapp/components/pos/payments/InvoiceTotals.vue";
+import { useInvoiceStore } from "../src/posapp/stores/invoiceStore.js";
+import { useUIStore } from "../src/posapp/stores/uiStore.js";
 
 const BoxStub = defineComponent({
 	setup(_, { slots }) {
@@ -62,21 +65,35 @@ const VTextFieldStub = defineComponent({
 });
 
 describe("InvoiceTotals", () => {
+	let pinia: ReturnType<typeof createPinia>;
+
 	beforeEach(() => {
-		(window as any).frappe = { _: (value: string) => value };
+		(window as any).frappe = {
+			_: (value: string) => value,
+			datetime: { nowdate: () => "2026-05-29" },
+		};
+		pinia = createPinia();
+		setActivePinia(pinia);
 	});
 
 	it("separates item/rate discounts from additional discount", () => {
+		const invoiceDoc = {
+			currency: "PKR",
+			net_total: 900,
+			total_taxes_and_charges: 0,
+			total: 900,
+			discount_amount: 50,
+			grand_total: 850,
+			custom_service_charge_amount: 0,
+		};
+
+		const invoiceStore = useInvoiceStore();
+		invoiceStore.setInvoiceDoc(invoiceDoc);
+		useUIStore().setPosProfile({ custom_enable_service_charge: 0 } as any);
+
 		const wrapper = mount(InvoiceTotals, {
 			props: {
-				invoice_doc: {
-					currency: "PKR",
-					net_total: 900,
-					total_taxes_and_charges: 0,
-					total: 900,
-					discount_amount: 50,
-					grand_total: 850,
-				},
+				invoice_doc: invoiceDoc,
 				itemDiscountTotal: 120,
 				displayCurrency: "PKR",
 				diff_payment: 0,
@@ -85,6 +102,7 @@ describe("InvoiceTotals", () => {
 				formatCurrency: (value: number) => String(value),
 			},
 			global: {
+				plugins: [pinia],
 				components: {
 					VRow: BoxStub,
 					VCol: BoxStub,

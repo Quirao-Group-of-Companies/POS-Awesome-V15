@@ -9,6 +9,12 @@ import { _getPlcConversionRate } from "./currency";
 declare const flt: (_value: unknown, _precision?: number) => number;
 declare const frappe: any;
 
+const round2 = (value: unknown): number => {
+	const n = Number(value);
+	if (!Number.isFinite(n)) return 0;
+	return Math.round((n + Number.EPSILON) * 100) / 100;
+};
+
 /** Must match SERVICE_CHARGE_TAX_DESCRIPTION in posawesome.posawesome.api.invoice */
 const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
 
@@ -40,6 +46,23 @@ function buildServiceChargeTaxRow(context: any, serviceCharge: number) {
 	};
 }
 
+/** Build one discount tax row for a given account head and amount. */
+function buildDiscountTaxRow(
+    accountHead: string,
+    discountAmount: number,
+    conversionRate: number,
+) {
+    if (!discountAmount || discountAmount === 0) return null;
+    return {
+        account_head: accountHead,
+        charge_type: "Actual",
+        description: "Special Discount",
+        tax_amount: discountAmount,
+        included_in_print_rate: 0,
+        base_tax_amount: discountAmount * conversionRate,
+    };
+}
+
 function buildSpecialDiscountTaxRow(context: any, discountAmount: number) {
     if (!discountAmount || discountAmount === 0) return null;
 
@@ -54,16 +77,7 @@ function buildSpecialDiscountTaxRow(context: any, discountAmount: number) {
     const accountHead = accountMap[discount_type];
     if (!accountHead) return null;
 
-    const conversionRate = context.conversion_rate || 1;
-
-    return {
-        account_head: accountHead,
-        charge_type: "Actual",
-        description: "Special Discount",
-        tax_amount: discountAmount,                      // -42 → backend subtracts it
-        included_in_print_rate: 0,
-        base_tax_amount: discountAmount * conversionRate, // -42
-    };
+    return buildDiscountTaxRow(accountHead, discountAmount, context.conversion_rate || 1);
 }
 
 function isSpecialDiscountTaxRow(tax: any): boolean {
@@ -109,6 +123,93 @@ function appendSpecialDiscount(
         (doc.total_taxes_and_charges || 0) + DiscountAmount,
     );
     return grandTotal + DiscountAmount;  // 210 + (-42) = 168, then +10 = 178... wait
+}
+
+/**
+ * Append discount tax rows with per-type split (Senior Citizen + PWD).
+ * Falls back to single-type behavior when patron details are unavailable.
+ */
+function appendDiscountTaxRows(
+    doc: any,
+    context: any,
+    totalDiscountAmount: number,
+    grandTotal: number,
+) {
+    if (!totalDiscountAmount || totalDiscountAmount === 0) return grandTotal;
+
+    const absDiscount = Math.abs(totalDiscountAmount);
+    const discountType = context?.invoice_doc?.custom_special_discount_type;
+    const patronRows = context?.invoice_doc?.custom_special_discount_details;
+    const hasPatrons = Array.isArray(patronRows) && patronRows.length > 0;
+
+    // When no per-patron details exist, fall back to single-type behavior.
+    if (!hasPatrons) {
+        return appendSpecialDiscount(doc, context, totalDiscountAmount, grandTotal);
+    }
+
+    const seniorCount = patronRows.filter(
+        (r: any) => String(r.discount_type || "").trim() === "Senior Citizen",
+    ).length;
+    const pwdCount = patronRows.filter(
+        (r: any) => String(r.discount_type || "").trim() === "PWD",
+    ).length;
+
+    const scAccount = context.company?.custom_default_senior_citizen_account;
+    const pwdAccount = context.company?.custom_default_pwd_account;
+
+    const conversionRate = context.conversion_rate || 1;
+
+    // If no mix, or missing accounts, fall back
+    if (seniorCount === 0 || pwdCount === 0) {
+        const singleType = seniorCount > 0 ? "Senior Citizen" : "PWD";
+        const account = singleType === "Senior Citizen" ? scAccount : pwdAccount;
+        if (!account) return appendSpecialDiscount(doc, context, totalDiscountAmount, grandTotal);
+
+        const row = buildDiscountTaxRow(account, totalDiscountAmount, conversionRate);
+        if (!row) return grandTotal;
+        doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+        doc.taxes.push(row);
+        doc.total_taxes_and_charges = flt((doc.total_taxes_and_charges || 0) + totalDiscountAmount);
+        return grandTotal + totalDiscountAmount;
+    }
+
+    // Split proportionally by pax count
+    const totalPax = seniorCount + pwdCount;
+    const perPax = absDiscount / totalPax;
+
+    let pwdAmount = round2(perPax * pwdCount);
+    let seniorAmount = round2(absDiscount - pwdAmount);
+
+    const sum = round2(pwdAmount + seniorAmount);
+    if (Math.abs(sum - round2(absDiscount)) > 0.01) {
+        if (pwdAmount >= seniorAmount) {
+            pwdAmount = round2(pwdAmount + round2(absDiscount) - sum);
+        } else {
+            seniorAmount = round2(seniorAmount + round2(absDiscount) - sum);
+        }
+    }
+
+    const sign = totalDiscountAmount < 0 ? -1 : 1;
+    const seniorRow = scAccount
+        ? buildDiscountTaxRow(scAccount, sign * seniorAmount, conversionRate)
+        : null;
+    const pwdRow = pwdAccount
+        ? buildDiscountTaxRow(pwdAccount, sign * pwdAmount, conversionRate)
+        : null;
+
+    doc.taxes = Array.isArray(doc.taxes) ? doc.taxes : [];
+    if (seniorRow) {
+        doc.taxes.push(seniorRow);
+        doc.total_taxes_and_charges = flt((doc.total_taxes_and_charges || 0) + sign * seniorAmount);
+        grandTotal += sign * seniorAmount;
+    }
+    if (pwdRow) {
+        doc.taxes.push(pwdRow);
+        doc.total_taxes_and_charges = flt((doc.total_taxes_and_charges || 0) + sign * pwdAmount);
+        grandTotal += sign * pwdAmount;
+    }
+
+    return grandTotal;
 }
 
 function normalizeBackendDate(context: any, value: any): string | null {
@@ -383,7 +484,8 @@ export function get_invoice_doc(context: any) {
 	// Calculate totals in selected currency ensuring negative values for returns
 	let total = context.Total;
 	if (isReturn && total > 0) total = -Math.abs(total);
-
+	console.log("context", context);
+	
 	doc.total = total;
 	doc.net_total = total; // Will adjust later if taxes are inclusive
 	doc.base_total = total * (context.conversion_rate || 1);
@@ -410,10 +512,23 @@ export function get_invoice_doc(context: any) {
 	let grandTotal = context.subtotal;
 
 	let serviceCharge = flt(context.service_charge || sourceDoc.posa_service_charge || 0);
-	let specialDiscountAmount = -Math.abs(flt(
-		context.invoice_doc?.custom_special_discount_amount ||
-		sourceDoc.custom_special_discount_amount || 0
-	));
+	const scDiscountAbs = Math.abs(
+		flt(
+			sourceDoc.custom_sc_discount_amount ||
+				context.invoice_doc?.custom_sc_discount_amount ||
+				sourceDoc.custom_special_discount_amount ||
+				context.invoice_doc?.custom_special_discount_amount ||
+				0,
+		),
+	);
+	const vatExemptAbs = Math.abs(
+		flt(
+			sourceDoc.custom_vat_exempt_amount ||
+				context.invoice_doc?.custom_vat_exempt_amount ||
+				0,
+		),
+	);
+	let specialDiscountAmount = -(scDiscountAbs + vatExemptAbs);
 	if (isReturn && serviceCharge > 0) {
 		serviceCharge = -Math.abs(serviceCharge);
 	}
@@ -494,7 +609,7 @@ export function get_invoice_doc(context: any) {
 		}
 	}
 
-	grandTotal = appendSpecialDiscount(doc, context, specialDiscountAmount, grandTotal);
+	grandTotal = appendDiscountTaxRows(doc, context, specialDiscountAmount, grandTotal);
 	grandTotal = appendServiceChargeTax(doc, context, serviceCharge, grandTotal);
 	if (context.invoiceStore?.invoiceDoc) {
 		context.invoiceStore.invoiceDoc.taxes = [...doc.taxes];

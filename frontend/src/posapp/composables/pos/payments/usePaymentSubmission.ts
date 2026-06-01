@@ -165,14 +165,33 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 		}
 	};
 
+	const parseStockMessage = (message: string): string | null => {
+		if (!message) return null;
+		try {
+			const parsed = JSON.parse(message);
+			if (Array.isArray(parsed?.errors) && parsed.errors.length) {
+				return formatStockErrors(parsed.errors);
+			}
+		} catch {
+			/* not stock JSON */
+		}
+		return null;
+	};
+
 	const extractSubmissionErrorMessage = (exc: any): string => {
 		if (!exc) {
 			return __("Unknown error");
 		}
 		if (isApiEnvelopeError(exc)) {
-			return exc.envelope.ok
-				? __("Unknown error")
-				: exc.envelope.error.message || __("Unknown error");
+			if (exc.envelope.ok) {
+				return __("Unknown error");
+			}
+			const envelopeMessage = exc.envelope.error.message || "";
+			return (
+				parseStockMessage(envelopeMessage) ||
+				envelopeMessage ||
+				__("Unknown error")
+			);
 		}
 		if (exc?._server_messages) {
 			try {
@@ -239,9 +258,16 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			};
 		}
 
-		if (code === "VALIDATION_ERROR" || code === "BUSINESS_RULE") {
+		if (
+			code === "VALIDATION_ERROR" ||
+			code === "BUSINESS_RULE" ||
+			code === "INSUFFICIENT_STOCK"
+		) {
 			return {
-				title: __("Unable to submit invoice"),
+				title:
+					code === "INSUFFICIENT_STOCK"
+						? __("Insufficient stock")
+						: __("Unable to submit invoice"),
 				detail: detail ? `${message}\n${detail}` : message,
 				color: "error",
 			};

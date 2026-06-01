@@ -14,8 +14,6 @@ export function useClosingSummary(
 	dialogData: any,
 	formatters: SummaryFormatters,
 ) {
-	console.log("overview",overview);
-	
 
 	const {
 		formatCurrencyWithSymbol,
@@ -291,14 +289,14 @@ export function useClosingSummary(
 			salesSummary.value.average_invoice_value,
 			overviewCompanyCurrency.value,
 		);
-
+		
 		return [
 			{
 				key: "total-invoices",
 				label: __("Total Invoices"),
 				value: formatCount(unref(overview)?.total_invoices || 0),
 				caption: `${__("Sales processed")}: ${formatCount(salesSummary.value.sale_invoices_count || 0)}`,
-				icon: "mdi-receipt-text-multiple",
+				icon: "mdi mdi-receipt-text-minus",
 				color: "accent-primary",
 			},
 			{
@@ -316,6 +314,14 @@ export function useClosingSummary(
 				caption: `${__("Before returns")}`,
 				icon: "mdi-chart-bar",
 				color: "accent-secondary",
+			},
+			{
+				key: "service-charges",
+				label: __("Total Service Charges"),
+				value: formatCurrency(unref(overview)?.total_service_charges || 0),
+				caption: `${__("Service Income")}`,
+				icon: "mdi mdi-room-service",
+				color: "accent-warning",
 			},
 			{
 				key: "average-ticket",

@@ -1,4 +1,12 @@
-"""Restaurant table status derived from POS / Sales Invoice records."""
+"""Restaurant table status derived from POS / Sales Invoice records.
+
+A table is considered occupied ONLY when:
+- There is an active (Open, submitted, not closed/cancelled) POS Opening Shift
+- There is an active (draft or unpaid submitted) POS/Sales Invoice linked to that
+  table that belongs to the current active opening shift.
+
+Closed or cancelled shifts free all tables.
+"""
 
 import frappe
 from frappe.utils import flt
@@ -12,6 +20,28 @@ def _resolve_invoice_doctype(pos_profile=None):
     ):
         return "POS Invoice"
     return "Sales Invoice"
+
+
+def _resolve_active_opening_shift(pos_profile=None, company=None):
+    """Return the name of the single active (Open) POS Opening Shift, or None."""
+    filters = {
+        "docstatus": 1,
+        "status": "Open",
+        "pos_closing_shift": ["is", "not set"],
+    }
+    if pos_profile:
+        filters["pos_profile"] = pos_profile
+    if company:
+        filters["company"] = company
+
+    shifts = frappe.get_all(
+        "POS Opening Shift",
+        filters=filters,
+        fields=["name"],
+        order_by="period_start_date desc",
+        limit=1,
+    )
+    return shifts[0]["name"] if shifts else None
 
 
 def _table_status_from_invoice(docstatus, outstanding_amount):
@@ -32,17 +62,30 @@ def _status_priority(status):
 def get_restaurant_table_status(company=None, pos_profile=None, floor=None):
     """Return live table occupancy from open restaurant invoices.
 
-    - Draft invoice (docstatus 0) with ``restaurant_table`` → Occupied
-    - Submitted, unpaid (outstanding > 0) → Bill-Cut
-    - Submitted, paid (outstanding <= 0) or cancelled/deleted → Vacant
+    A table is "Occupied" only when:
+    - An active POS Opening Shift exists (docstatus=1, status=Open, not closed)
+    - An active (draft or unpaid submitted) invoice exists for that table
+    - The invoice belongs to the current active opening shift
+
+    When the shift is closed or cancelled, all tables become "Available".
     """
     doctype = _resolve_invoice_doctype(pos_profile)
+
+    # Guard: the required fields must exist on the doctype
     if not frappe.db.has_column(doctype, "restaurant_table"):
+        return {"tables": {}}
+    if not frappe.db.has_column(doctype, "posa_pos_opening_shift"):
+        return {"tables": {}}
+
+    # Only invoices under the currently active opening shift count
+    active_shift = _resolve_active_opening_shift(pos_profile, company)
+    if not active_shift:
         return {"tables": {}}
 
     filters = {
         "docstatus": ["!=", 2],
         "restaurant_table": ["is", "set"],
+        "posa_pos_opening_shift": active_shift,
     }
     if company:
         filters["company"] = company

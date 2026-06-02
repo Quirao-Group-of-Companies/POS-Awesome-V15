@@ -257,6 +257,7 @@ function startElapsedTimer() {
 	stopElapsedTimer();
 	elapsedTimer = window.setInterval(() => {
 		nowTick.value = Date.now();
+		fetchTables();
 	}, 60_000);
 }
 

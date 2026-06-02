@@ -22,7 +22,7 @@ def _resolve_invoice_doctype(pos_profile=None):
     return "Sales Invoice"
 
 
-def _resolve_active_opening_shift(pos_profile=None, company=None):
+def resolve_active_opening_shift(pos_profile=None, company=None):
     """Return the name of the single active (Open) POS Opening Shift, or None."""
     filters = {
         "docstatus": 1,
@@ -78,7 +78,7 @@ def get_restaurant_table_status(company=None, pos_profile=None, floor=None):
         return {"tables": {}}
 
     # Only invoices under the currently active opening shift count
-    active_shift = _resolve_active_opening_shift(pos_profile, company)
+    active_shift = resolve_active_opening_shift(pos_profile, company)
     if not active_shift:
         return {"tables": {}}
 

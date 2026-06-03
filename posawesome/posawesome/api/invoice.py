@@ -326,8 +326,12 @@ def calc_delivery_charges(doc):
 
 
 def calc_service_charge(doc):
-    """Mirror delivery charges: store amount on posa_service_charge and add an Actual tax row."""
-    if not doc.company:
+    """Add Service Charge as an Actual tax row so ERPNext includes it in grand_total computation.
+    
+    ONLY manages tax rows for POS Invoice doctype — does NOT touch taxes during
+    Sales Invoice merge (POS Closing Shift), where tax rows are already correctly
+    summed by merge_pos_invoice_into()."""
+    if not doc.company or doc.doctype != "POS Invoice":
         return
 
     service_charge = flt(doc.get("posa_service_charge"))

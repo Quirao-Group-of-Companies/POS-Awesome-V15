@@ -52,7 +52,7 @@
 							:payments="visiblePaymentMethods"
 							:currency="displayCurrency"
 							:grand-total="netInvoiceSettlementAmount"
-							:total="invoice_doc?.total || 0"
+							:total="invoice_doc?.grand_total || 0"
 							:is-return="is_return"
 							:request-payment-field="requestPaymentField"
 							:currency-symbol="currencySymbol"
@@ -424,7 +424,7 @@ const isCardModeName = (mop) => {
     return name.includes("credit card") || name.includes("debit card");
 };
 
-const handleCardDetailUpdate = (payment, field, value) => {
+const handleUpdateCardDetail = (payment, field, value) => {
     payment[field] = value;
 };
 

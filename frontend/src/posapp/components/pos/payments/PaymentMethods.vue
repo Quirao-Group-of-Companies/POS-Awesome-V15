@@ -28,7 +28,7 @@
 						:label="frappe._('Amount')"
 						:class="['sleek-field pos-themed-input', isReturn ? 'pos-themed-input--refund' : '']"
 						hide-details
-						:model-value="formatCurrency(total)"
+						:model-value="payment.default === 1 ? formatCurrency(total) : formatCurrency(payment.amount)"
 						@change="$emit('update-amount', payment, $event)"
 						:rules="[isNumber]"
 						:prefix="currencySymbol(currency)"

@@ -642,7 +642,23 @@ def _get_mutable_invoice_doc(data, doctype):
         )
         return frappe.get_doc(fresh_payload)
 
+    # Preserve custom_kitchen_served set directly on DB by kitchen display
+    item_doctype = f"{doctype} Item"
+    kitchen_served_map = {}
+    if frappe.db.has_column(item_doctype, "custom_kitchen_served"):
+        kitchen_served_map = {
+            item.item_code: item.custom_kitchen_served
+            for item in invoice_doc.get("items", [])
+            if item.get("custom_kitchen_served") and item.get("item_code")
+        }
+
     invoice_doc.update(data)
+
+    if kitchen_served_map:
+        for item in invoice_doc.get("items", []):
+            if item.get("item_code") and item.item_code in kitchen_served_map:
+                item.custom_kitchen_served = kitchen_served_map[item.item_code]
+
     invoice_doc = _clear_stale_party_fields_for_customer_change(
         invoice_doc,
         data,

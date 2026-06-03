@@ -3,6 +3,7 @@
 import frappe
 from frappe import _
 from frappe.utils import cint, flt
+from posawesome.posawesome.api.restaurant import resolve_active_opening_shift
 
 
 def _invoice_doctype():
@@ -90,6 +91,15 @@ def get_kitchen_orders(company=None):
 
 	items_by_parent = {}
 	for item in items:
+		active_shift = resolve_active_opening_shift(item.get("pos_profile"), company)
+		if not active_shift:
+			continue
+
+		pos_shift = frappe.db.get_value(doctype, item.get("parent"), "posa_pos_opening_shift")
+
+		if active_shift != pos_shift:
+			continue
+
 		if flt(item.get("qty")) <= 0:
 			continue
 		item_group = (item.get("item_group") or "").strip()

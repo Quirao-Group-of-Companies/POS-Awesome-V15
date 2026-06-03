@@ -4,6 +4,7 @@ import {
 	memoryInitPromise,
 } from "./offline/index";
 import nunjucks from "nunjucks";
+import { calculatePosBreakdownFromDoc } from "./posapp/utils/phScPwdDiscount";
 
 declare const frappe: any;
 
@@ -73,6 +74,28 @@ function defaultOfflineHTML(invoice: any, terms = "") {
 		})
 		.join("");
 
+	const breakdown =
+		invoice.custom_sc_pwd_pax > 0 || invoice.custom_sc_discount_amount > 0
+			? (() => {
+					const bd = calculatePosBreakdownFromDoc(invoice);
+					if (!bd) return "";
+					return `<table class="breakdown">
+                <tbody>
+                    <tr><td class="bd-label">Subtotal</td><td class="bd-value">${bd.subtotal}</td></tr>
+                    <tr><td class="bd-label bd-indent">VATable Sales (excl. VAT)</td><td class="bd-value">${bd.vatableSales}</td></tr>
+                    <tr><td class="bd-label bd-indent">VAT Exempt Sales</td><td class="bd-value">${bd.vatExemptSales}</td></tr>
+                    <tr><td class="bd-label">VAT (12%)</td><td class="bd-value">${bd.vatAmount}</td></tr>
+                    ${bd.serviceCharge > 0 ? `<tr><td class="bd-label">Service Charge (5%)</td><td class="bd-value">${bd.serviceCharge}</td></tr>` : ""}
+                    <tr><td colspan="2" class="bd-divider"></td></tr>
+                    ${bd.totalDiscount > 0 ? `<tr><td class="bd-label bd-deduct">LESS: Senior/PWD Discount</td><td class="bd-value bd-deduct">${bd.totalDiscount}</td></tr>` : ""}
+                    ${bd.vatExemptionAdjustment > 0 ? `<tr><td class="bd-label bd-deduct">LESS: VAT Exempt Adjustment</td><td class="bd-value bd-deduct">${bd.vatExemptionAdjustment}</td></tr>` : ""}
+                    <tr><td colspan="2" class="bd-divider bd-divider-thick"></td></tr>
+                    <tr><td class="bd-label bd-total">Total Amount Due</td><td class="bd-value bd-total">${bd.grandTotal}</td></tr>
+                </tbody>
+            </table>`;
+				})()
+			: "";
+
 	const taxesRows = (invoice.taxes || [])
 		.map(
 			(row: any) => `<tr>
@@ -118,6 +141,15 @@ function defaultOfflineHTML(invoice: any, terms = "") {
         th { text-align: left; }
         td.qty, td.rate, td.amount { text-align: right; }
         table.totals td { border-bottom: none; }
+        .bd-label { text-align: left; }
+        .bd-value { text-align: right; }
+        .bd-indent { padding-left: 1rem; font-size: 11px; }
+        .bd-deduct { color: #c00; }
+        .bd-total { font-weight: bold; font-size: 13px; }
+        .bd-divider { border-bottom: 1px dashed #aaa; padding: 0; }
+        .bd-divider-thick { border-bottom: 2px solid #333; }
+        table.breakdown { width: 100%; margin-top: 6px; }
+        table.breakdown td { font-size: 12px; padding: 2px 0; border: none; }
         .terms { margin-top: 8px; font-size: 10px; }
         .footer { text-align: center; margin-top: 8px; font-size: 11px; }
     </style>
@@ -146,6 +178,7 @@ function defaultOfflineHTML(invoice: any, terms = "") {
         </thead>
         <tbody>${itemsRows}</tbody>
     </table>
+    ${breakdown}
     <table class="totals">
         <tbody>
             ${taxesRows}

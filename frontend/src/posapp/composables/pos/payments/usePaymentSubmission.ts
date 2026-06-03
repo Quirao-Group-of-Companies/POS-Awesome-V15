@@ -9,6 +9,7 @@ import {
 import { ensureInvoiceClientRequestId } from "../../../../offline/idempotency";
 import stockCoordinator from "../../../utils/stockCoordinator";
 import { parseBooleanSetting } from "../../../utils/stock";
+import { calculatePosBreakdownFromDoc } from "../../../utils/phScPwdDiscount";
 
 declare const frappe: any;
 declare const __: (_str: string, _args?: any[]) => string;
@@ -968,7 +969,20 @@ export function usePaymentSubmission(options: PaymentSubmissionOptions) {
 			if (customerCreditDict) customerCreditDict.value = [];
 
 			if (stores?.invoiceStore?.invoiceDoc) {
-				stores.invoiceStore.invoiceDoc.docstatus = 1;
+				const submittedDoc = { ...r.message };
+				// Preserve the frontend custom meta that the backend may have stripped.
+				if (stores.invoiceStore.invoiceDoc.custom_total_pax != null) {
+					submittedDoc.custom_total_pax = stores.invoiceStore.invoiceDoc.custom_total_pax;
+				}
+				if (stores.invoiceStore.invoiceDoc.custom_sc_pwd_pax != null) {
+					submittedDoc.custom_sc_pwd_pax = stores.invoiceStore.invoiceDoc.custom_sc_pwd_pax;
+				}
+				stores.invoiceStore.setInvoiceDoc(submittedDoc);
+				// Recalculate and expose breakdown so the UI shows the backend-confirmed total.
+				const bd = calculatePosBreakdownFromDoc(submittedDoc);
+				if (bd) {
+					submittedDoc._pos_breakdown = bd;
+				}
 			}
 
 			if (stores?.uiStore) {

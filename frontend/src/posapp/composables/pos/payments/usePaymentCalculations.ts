@@ -1,5 +1,6 @@
 import { computed, unref, type Ref } from "vue";
 import { formatUtils } from "../../../format";
+import { calculatePosBreakdownFromDoc } from "../../../utils/phScPwdDiscount";
 
 declare const window: any;
 
@@ -124,22 +125,48 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 		return amount;
 	});
 
-	const diff_payment = computed(() => {
+	/**
+	 * Compute the POS breakdown from the invoice doc.
+	 * Used as single source of truth for the invoice total / amount due.
+	 * Only returns a breakdown when SC/PWD is active, otherwise null.
+	 */
+	const breakdown = computed(() => {
+		const doc = unref(invoiceDoc);
+		if (!doc) return null;
+		const hasScPwd =
+			Number(doc.custom_sc_pwd_pax) > 0 ||
+			Number(doc.custom_sc_discount_amount) > 0;
+		if (!hasScPwd) return null;
+		return calculatePosBreakdownFromDoc(doc);
+	});
+
+	/**
+	 * Resolve the invoice total (or amount due) that drives diff_payment.
+	 * Prefers the breakdown grand_total (the correct SC/PWD-adjusted value),
+	 * then falls back to doc.rounded_total / doc.grand_total.
+	 */
+	const invoiceTotal = computed(() => {
+		const bd = breakdown.value;
+		if (bd) return bd.grandTotal;
+
 		const doc = unref(invoiceDoc);
 		const profile = unref(posProfile);
 		if (!doc) return 0;
 
-		let invoice_total;
 		if (
 			profile.posa_allow_multi_currency &&
 			doc.currency !== profile.currency
 		) {
-			invoice_total = flt(doc.grand_total);
-		} else {
-			invoice_total = flt(doc.rounded_total || doc.grand_total);
+			return flt(doc.grand_total);
 		}
+		return flt(doc.rounded_total || doc.grand_total);
+	});
 
-		let diff = flt(invoice_total - total_payments.value);
+	const diff_payment = computed(() => {
+		const doc = unref(invoiceDoc);
+		if (!doc) return 0;
+
+		let diff = flt(invoiceTotal.value - total_payments.value);
 		// For returns: negative diff means more refund needed, positive means over-refunded (cap to 0)
 		if (doc.is_return) return diff > 0 ? 0 : diff;
 		return diff;
@@ -147,20 +174,9 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 
 	const change_due = computed(() => {
 		const doc = unref(invoiceDoc);
-		const profile = unref(posProfile);
 		if (!doc) return 0;
 
-		let invoice_total;
-		if (
-			profile.posa_allow_multi_currency &&
-			doc.currency !== profile.currency
-		) {
-			invoice_total = flt(doc.grand_total);
-		} else {
-			invoice_total = flt(doc.rounded_total || doc.grand_total);
-		}
-
-		let change = flt(total_payments.value - invoice_total);
+		let change = flt(total_payments.value - invoiceTotal.value);
 		return change > 0 ? change : 0;
 	});
 
@@ -220,6 +236,8 @@ export function usePaymentCalculations(options: PaymentCalculationOptions) {
 		paymentAmountSummary,
 		total_payments,
 		total_payments_display,
+		breakdown,
+		invoiceTotal,
 		diff_payment,
 		diff_payment_display,
 		change_due,

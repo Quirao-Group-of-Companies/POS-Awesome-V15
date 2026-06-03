@@ -186,6 +186,7 @@ import { useUIStore } from "../../../stores/uiStore.js";
 import { useFormat } from "../../../format.ts";
 import {
 	applyPhScPwdDiscountToDoc,
+	calculatePosBreakdown,
 	captureOriginalTotals,
 	clearPhScPwdDiscountFromDoc,
 	computePhScPwdBreakdownFromGrandTotal,
@@ -218,12 +219,30 @@ const originalValues = ref(captureOriginalTotals(null));
 const originalServiceCharge = ref(0);
 
 const SERVICE_CHARGE_TAX_DESCRIPTION = "Service Charge";
+const VAT_EXEMPT_TAX_DESCRIPTION = "VAT Exempt Adjustment";
 
 const isServiceChargeTaxRow = (tax) =>
 	tax?.charge_type === "Actual" &&
 	(typeof tax?.description === "string"
 		? tax.description.includes(SERVICE_CHARGE_TAX_DESCRIPTION)
 		: false);
+
+const isVatExemptTaxRow = (tax) =>
+	tax?.charge_type === "Actual" &&
+	(typeof tax?.description === "string"
+		? tax.description === VAT_EXEMPT_TAX_DESCRIPTION
+		: false);
+
+const resolveVatOutputAccountFromTaxes = (taxes) => {
+	const rows = Array.isArray(taxes) ? taxes : [];
+	const vatRow = rows.find(
+		(t) =>
+			t?.charge_type === "On Net Total" &&
+			Number(t?.rate) === 12 &&
+			t?.account_head,
+	);
+	return vatRow?.account_head || null;
+};
 
 const extractServiceChargeFromDoc = (doc) => {
 	if (!doc || !Array.isArray(doc.taxes)) return 0;
@@ -456,14 +475,26 @@ const discountedTotals = computed(() => {
 	return {
 		net_total: parseFloat((originalValues.value.net_total - discount).toFixed(2)),
 		total_taxes_and_charges: parseFloat(
-			(originalValues.value.total_taxes_and_charges - existingSC - vatExempt + serviceCharge).toFixed(2),
+			(originalValues.value.total_taxes_and_charges - existingSC - discount - vatExempt + serviceCharge).toFixed(2),
 		),
 		total: parseFloat(
 			(originalValues.value.total - existingSC - discount - vatExempt + serviceCharge).toFixed(2),
 		),
-		grand_total: parseFloat(
-			(originalValues.value.grand_total - existingSC - discount - vatExempt + serviceCharge).toFixed(2),
-		),
+		grand_total: (() => {
+			const items =
+				Array.isArray(invoiceStore.items) ? invoiceStore.items
+				: Array.isArray(props.invoiceDoc?.items) ? props.invoiceDoc.items
+				: [];
+			const totalPax = normalizedTotalPax.value;
+			const scPax = effectiveScPax.value;
+			if (items.length > 0) {
+				const bd = calculatePosBreakdown(items, totalPax, scPax, 0, serviceCharge);
+				if (bd) return bd.grandTotal;
+			}
+			return parseFloat(
+				(originalValues.value.grand_total - existingSC - discount - vatExempt + serviceCharge).toFixed(2),
+			);
+		})(),
 	};
 });
 
@@ -610,11 +641,45 @@ watch(
 		newDiscountRows.forEach((row) => taxesWithoutDiscount.push(row));
 		updatedTaxes.splice(0, updatedTaxes.length, ...taxesWithoutDiscount);
 
+		// --- VAT Exempt row ---
+		const existingVatExemptRow = updatedTaxes.find((t) => isVatExemptTaxRow(t));
+		if (existingVatExemptRow) {
+			existingVatExemptRow.tax_amount = -vatExempt;
+			existingVatExemptRow.base_tax_amount = -vatExempt;
+		} else if (vatExempt > 0) {
+			const vatAccount = resolveVatOutputAccountFromTaxes(updatedTaxes);
+			if (vatAccount) {
+				updatedTaxes.push({
+					charge_type: "Actual",
+					account_head: vatAccount,
+					description: VAT_EXEMPT_TAX_DESCRIPTION,
+					tax_amount: -vatExempt,
+					base_tax_amount: -vatExempt,
+					rate: 0,
+					included_in_print_rate: 0,
+				});
+			}
+		}
+
 		// 2. Calculate final totals (replace flat SC with prorated SC)
-		const finalTaxes = parseFloat((adjustedBaseTaxes + serviceCharge - vatExempt).toFixed(2));
-		const finalGrandTotal = parseFloat(
-			(adjustedBaseGrandTotal + serviceCharge - discount - vatExempt).toFixed(2),
-		);
+		const finalTaxes = parseFloat((adjustedBaseTaxes + serviceCharge - discount - vatExempt).toFixed(2));
+
+		// Use the POS breakdown as the single source of truth for grand_total.
+		// This avoids the stale-VAT-in-base bug in the old formula.
+		let finalGrandTotal;
+		const itemsArray = Array.isArray(currentDoc?.items) ? currentDoc.items : [];
+		const totalPax = normalizedTotalPax.value;
+		const scPax = effectiveScPax.value;
+		if (itemsArray.length > 0) {
+			const bd = calculatePosBreakdown(itemsArray, totalPax, scPax, 0, serviceCharge);
+			finalGrandTotal = bd ? bd.grandTotal : parseFloat(
+				(adjustedBaseGrandTotal + serviceCharge - discount - vatExempt).toFixed(2),
+			);
+		} else {
+			finalGrandTotal = parseFloat(
+				(adjustedBaseGrandTotal + serviceCharge - discount - vatExempt).toFixed(2),
+			);
+		}
 
 		// 3. Update active payment amount
 		const payments = Array.isArray(currentDoc?.payments)
@@ -745,6 +810,7 @@ const handleSave = () => {
 	const currentDoc = { ...(invoiceStore.invoiceDoc || props.invoiceDoc || {}) };
 	const original = captureOriginalTotals(currentDoc);
 	originalValues.value = original;
+	originalServiceCharge.value = extractServiceChargeFromDoc(currentDoc);
 
 	const totals = discountedTotals.value;
 	const serviceCharge = calculatedServiceCharge.value;
@@ -798,6 +864,24 @@ const handleSave = () => {
 			});
 		}
 	}
+
+	// --- VAT Exempt Adjustment row ---
+	const vatExemptAmt = round2(breakdown.vatExempt || 0);
+	if (vatExemptAmt > 0) {
+		const vatAccount = resolveVatOutputAccountFromTaxes(baseTaxes);
+		if (vatAccount) {
+			baseTaxes.push({
+				charge_type: "Actual",
+				account_head: vatAccount,
+				description: VAT_EXEMPT_TAX_DESCRIPTION,
+				tax_amount: -vatExemptAmt,
+				base_tax_amount: -vatExemptAmt,
+				rate: 0,
+				included_in_print_rate: 0,
+			});
+		}
+	}
+
 	patched.taxes = baseTaxes;
 
 	patched.payments = syncPaymentsToGrandTotal(patched, patched.grand_total);
@@ -817,9 +901,11 @@ const handleClear = () => {
 	const cleared = clearPhScPwdDiscountFromDoc(currentDoc, original);
 	cleared.custom_special_discount_details = [];
 
-	// Remove discount tax rows
+	// Remove discount and vat exempt tax rows
 	if (Array.isArray(cleared.taxes)) {
-		cleared.taxes = cleared.taxes.filter((t) => !isSpecialDiscountTaxRow(t));
+		cleared.taxes = cleared.taxes.filter(
+			(t) => !isSpecialDiscountTaxRow(t) && !isVatExemptTaxRow(t),
+		);
 	}
 
 	cleared.payments = syncPaymentsToGrandTotal(cleared, cleared.grand_total);
@@ -833,6 +919,7 @@ const handleClear = () => {
 	localScPax.value = 1;
 	userAdjustedTotalPax.value = false;
 	originalValues.value = original;
+	originalServiceCharge.value = extractServiceChargeFromDoc(cleared);
 	syncTotalPaxFromCustomerCount(cleared, { force: true });
 };
 
